@@ -10,12 +10,20 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ConnexionRouteImport } from './routes/connexion'
 import { Route as ArtisteSenbeiRouteImport } from './routes/artiste.senbei'
 import { Route as CollecteSenbeiRouteImport } from './routes/collecte.senbei'
+import { Route as ExtractionsIndexRouteImport } from './routes/extractions.index'
+import { Route as ExtractionsArtistIdRouteImport } from './routes/extractions.$artistId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConnexionRoute = ConnexionRouteImport.update({
+  id: '/connexion',
+  path: '/connexion',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ArtisteSenbeiRoute = ArtisteSenbeiRouteImport.update({
@@ -28,35 +36,76 @@ const CollecteSenbeiRoute = CollecteSenbeiRouteImport.update({
   path: '/collecte/senbei',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ExtractionsIndexRoute = ExtractionsIndexRouteImport.update({
+  id: '/extractions/',
+  path: '/extractions/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExtractionsArtistIdRoute = ExtractionsArtistIdRouteImport.update({
+  id: '/extractions/$artistId',
+  path: '/extractions/$artistId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/connexion': typeof ConnexionRoute
   '/artiste/senbei': typeof ArtisteSenbeiRoute
   '/collecte/senbei': typeof CollecteSenbeiRoute
+  '/extractions/$artistId': typeof ExtractionsArtistIdRoute
+  '/extractions/': typeof ExtractionsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/connexion': typeof ConnexionRoute
   '/artiste/senbei': typeof ArtisteSenbeiRoute
   '/collecte/senbei': typeof CollecteSenbeiRoute
+  '/extractions/$artistId': typeof ExtractionsArtistIdRoute
+  '/extractions': typeof ExtractionsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/connexion': typeof ConnexionRoute
   '/artiste/senbei': typeof ArtisteSenbeiRoute
   '/collecte/senbei': typeof CollecteSenbeiRoute
+  '/extractions/$artistId': typeof ExtractionsArtistIdRoute
+  '/extractions/': typeof ExtractionsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/artiste/senbei' | '/collecte/senbei'
+  fullPaths:
+    | '/'
+    | '/connexion'
+    | '/artiste/senbei'
+    | '/collecte/senbei'
+    | '/extractions/$artistId'
+    | '/extractions/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/artiste/senbei' | '/collecte/senbei'
-  id: '__root__' | '/' | '/artiste/senbei' | '/collecte/senbei'
+  to:
+    | '/'
+    | '/connexion'
+    | '/artiste/senbei'
+    | '/collecte/senbei'
+    | '/extractions/$artistId'
+    | '/extractions'
+  id:
+    | '__root__'
+    | '/'
+    | '/connexion'
+    | '/artiste/senbei'
+    | '/collecte/senbei'
+    | '/extractions/$artistId'
+    | '/extractions/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ConnexionRoute: typeof ConnexionRoute
   ArtisteSenbeiRoute: typeof ArtisteSenbeiRoute
   CollecteSenbeiRoute: typeof CollecteSenbeiRoute
+  ExtractionsArtistIdRoute: typeof ExtractionsArtistIdRoute
+  ExtractionsIndexRoute: typeof ExtractionsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -66,6 +115,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/connexion': {
+      id: '/connexion'
+      path: '/connexion'
+      fullPath: '/connexion'
+      preLoaderRoute: typeof ConnexionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/artiste/senbei': {
@@ -82,13 +138,30 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CollecteSenbeiRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/extractions/': {
+      id: '/extractions/'
+      path: '/extractions'
+      fullPath: '/extractions/'
+      preLoaderRoute: typeof ExtractionsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/extractions/$artistId': {
+      id: '/extractions/$artistId'
+      path: '/extractions/$artistId'
+      fullPath: '/extractions/$artistId'
+      preLoaderRoute: typeof ExtractionsArtistIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ConnexionRoute: ConnexionRoute,
   ArtisteSenbeiRoute: ArtisteSenbeiRoute,
   CollecteSenbeiRoute: CollecteSenbeiRoute,
+  ExtractionsArtistIdRoute: ExtractionsArtistIdRoute,
+  ExtractionsIndexRoute: ExtractionsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

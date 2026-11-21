@@ -43,3 +43,19 @@ use the editor.
 
 - Load Cytoscape dynamically after mount and destroy each instance on unmount; keep graph selection and claim-divergence rules in a pure data module for SSR safety and tests.
 - Source graph colors from global semantic tokens, with deterministic centered preset positions; node filters include only the top 20 ranked recordings and explicit artist proximity edges.
+
+## Backend (extractions)
+
+- Le backend est le projet Supabase du dépôt `zikinde` (contrat : `zikinde/docs/FRONTEND.md`). Ce front ne gère
+  ni le schéma ni les migrations : ne pas activer Lovable Cloud ni créer de projet Supabase, ne rien ajouter dans
+  `supabase/migrations/` ici.
+- Tout accès au backend passe par `src/lib/backend.ts` (lecture des vues `v_*`, écriture uniquement via les RPC).
+  Le client est créé dans `src/lib/supabase.ts` à partir de `VITE_SUPABASE_URL` et `VITE_SUPABASE_PUBLISHABLE_KEY`
+  (valeurs publiques ; jamais la clé `service_role`).
+- Les pages qui utilisent la session (`/connexion`, `/extractions`, `/extractions/$artistId`) sont en `ssr: false` :
+  la session vit dans le navigateur.
+- Parcours : recherche → job `discover` → l'utilisateur choisit le bon compte (jamais de présélection) →
+  `track_artist` → progression en direct du job `collect` → résultats.
+- Les pages `/collecte/senbei` et `/artiste/senbei` restent la démonstration statique du référentiel.
+- Déploiement : `scripts/deploy-cloudflare.sh` (Cloudflare Workers, domaine `zikinde.claves-technologies.fr`,
+  prérequis `npx wrangler@4 login`). Pas de Lovable pour la mise en ligne.
