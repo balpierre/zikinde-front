@@ -10,11 +10,14 @@ import {
   X,
   Database,
   CornerDownLeft,
+  Fingerprint,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { OrganizationSelect } from "@/components/extractions/organization-select";
 import { Concepts, Shell, metadata } from "@/components/label-pulse/shared";
 import { correspondSenbei } from "@/lib/libelles";
+import { referentielQuery } from "@/lib/referentiel";
+import { detectIdentifier, findByIdentifier, messageIntrouvable } from "@/lib/identifiants";
 import { useSession } from "@/hooks/use-session";
 import {
   organizationsQuery,
@@ -52,8 +55,25 @@ function Index() {
   const busy = visiblePhase === "searching" || visiblePhase === "starting";
   const found = correspondSenbei(query);
   const hasQuery = query.trim().length > 0;
+  const identifiant = detectIdentifier(query);
+  // Identifiers are looked up in every loaded referential, without a backend round trip.
+  const referentiels = useQuery({ ...referentielQuery, enabled: identifiant !== null });
+  const resultats =
+    identifiant && referentiels.data?.data
+      ? findByIdentifier([referentiels.data.data], identifiant)
+      : [];
+
+  function ouvrir(index: number) {
+    const resultat = resultats[index];
+    if (!resultat) return;
+    void navigate({ to: "/artiste/senbei", search: resultat.cible });
+  }
 
   async function search() {
+    if (identifiant) {
+      ouvrir(0);
+      return;
+    }
     const name = query.trim();
     if (!name || busy) return;
     if (!session) {
@@ -134,10 +154,11 @@ function Index() {
             <div className="search-input-row">
               <Search size={23} aria-hidden="true" />
               <input
-                aria-label="Rechercher un artiste"
+                aria-label="Rechercher un artiste ou un identifiant"
                 aria-autocomplete="list"
                 aria-controls="artist-results"
-                placeholder="Un nom d’artiste…"
+                aria-describedby="search-hint"
+                placeholder="Un nom d’artiste, un ISRC, un ISWC ou un UPC…"
                 value={query}
                 disabled={busy}
                 onChange={(event) => {
@@ -169,7 +190,46 @@ function Index() {
             </div>
             {hasQuery && (
               <div id="artist-results" className="search-results" aria-live="polite">
-                {visiblePhase === "idle" && (
+                {identifiant && (
+                  <>
+                    {referentiels.isPending && (
+                      <div className="empty-result">
+                        <span className="flex items-center gap-2">
+                          <LoaderCircle className="animate-spin" size={16} />
+                          Recherche de l’{identifiant.code} dans le référentiel…
+                        </span>
+                      </div>
+                    )}
+                    {!referentiels.isPending && !referentiels.data?.data && (
+                      <div className="empty-result">
+                        <span>Le référentiel est indisponible pour le moment.</span>
+                      </div>
+                    )}
+                    {referentiels.data?.data && resultats.length === 0 && (
+                      <div className="empty-result" role="status">
+                        <span>{messageIntrouvable(identifiant)}</span>
+                      </div>
+                    )}
+                    {resultats.map((r) => (
+                      <Button key={r.noeud.id} asChild variant="ghost" className="artist-result">
+                        <Link to="/artiste/senbei" search={r.cible}>
+                          <span className="artist-avatar">
+                            <Fingerprint size={23} />
+                          </span>
+                          <span className="artist-result-name">
+                            <strong>{r.titre}</strong>
+                            <span>
+                              <span className="identifier-type">{r.typeObjet}</span> · {r.artiste} ·{" "}
+                              <span className="mono">{identifiant.code}</span>
+                            </span>
+                          </span>
+                          <ArrowRight className="result-arrow" />
+                        </Link>
+                      </Button>
+                    ))}
+                  </>
+                )}
+                {!identifiant && visiblePhase === "idle" && (
                   <div className="empty-result">
                     <span>
                       {session
@@ -258,6 +318,9 @@ function Index() {
               </div>
             )}
           </form>
+          <p id="search-hint" className="search-hint">
+            Nom d’artiste, ISRC, ISWC ou UPC
+          </p>
           <div className="search-under">
             <span>
               <Database size={13} /> Catalogue indépendant

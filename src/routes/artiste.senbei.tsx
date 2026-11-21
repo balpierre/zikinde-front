@@ -58,6 +58,7 @@ interface ArtistSearch {
   anomalie?: string;
   correction?: boolean;
   type?: "recording" | "release";
+  entite?: string;
 }
 export const Route = createFileRoute("/artiste/senbei")({
   validateSearch: (search: Record<string, unknown>): ArtistSearch => ({
@@ -71,6 +72,7 @@ export const Route = createFileRoute("/artiste/senbei")({
     ...(search["type"] === "recording" || search["type"] === "release"
       ? { type: search["type"] }
       : {}),
+    ...(typeof search["entite"] === "string" ? { entite: search["entite"] } : {}),
     ...(search["correction"] === true || search["correction"] === "1" ? { correction: true } : {}),
   }),
   head: () =>
@@ -232,7 +234,12 @@ function Artiste() {
             }
           />
         ) : graphActive && data ? (
-          <Graphe key={search.type ?? "tous"} data={data} type={search.type} />
+          <Graphe
+            key={`${search.type ?? "tous"}|${search.entite ?? ""}`}
+            data={data}
+            type={search.type}
+            entite={search.entite}
+          />
         ) : anomaliesActive && data ? (
           <Anomalies
             data={data}

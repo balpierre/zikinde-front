@@ -29,6 +29,7 @@ export function selectionGraphe(
   data: Referentiel,
   types: readonly string[] = typesParDefaut,
   inferred = false,
+  inclure?: string,
 ) {
   const focus =
     data.meta.focus_artist ??
@@ -71,7 +72,11 @@ export function selectionGraphe(
         )
       : [],
   );
-  const nodes = [...base, ...data.nodes.filter((n) => releaseIds.has(n.id))];
+  // An object opened from the search stays visible whatever its rank or type filter.
+  const nodes = [
+    ...base,
+    ...data.nodes.filter((n) => releaseIds.has(n.id) || (n.id === inclure && !baseIds.has(n.id))),
+  ];
   const ids = new Set(nodes.map((n) => n.id));
   const visibles = data.edges.filter((e) => ids.has(e.source) && ids.has(e.target));
   const edges: AreteGraphe[] = [

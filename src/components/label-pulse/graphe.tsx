@@ -291,19 +291,24 @@ function Relation({
 export function Graphe({
   data: referentiel,
   type,
+  entite,
 }: {
   data: Referentiel;
   type?: string | undefined;
+  entite?: string | undefined;
 }) {
   const data = useMemo(() => fusionnerSansLabel(referentiel), [referentiel]);
   const [types, setTypes] = useState<string[]>(() => typesFiltres(type));
   const [inferred, setInferred] = useState(false);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(entite ?? null);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
   const container = useRef<HTMLDivElement>(null);
   const cy = useRef<Core | null>(null);
-  const projection = useMemo(() => selectionGraphe(data, types, inferred), [data, types, inferred]);
+  const projection = useMemo(
+    () => selectionGraphe(data, types, inferred, entite),
+    [data, types, inferred, entite],
+  );
   const noeuds = useMemo(() => new Map(data.nodes.map((n) => [n.id, n])), [data]);
   const node = selected ? noeuds.get(selected) : undefined;
   const visibles = useMemo(() => new Set(projection.nodes.map((n) => n.id)), [projection]);

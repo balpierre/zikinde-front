@@ -3061,3 +3061,13 @@ a.source-badge:hover {
   font-size: 12px;
   cursor: pointer;
 }
+
+/* Identifier search: discreet format hint and object type in suggestions. */
+.search-hint {
+  margin: 8px 1px 0;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.identifier-type {
+  color: var(--primary);
+}
