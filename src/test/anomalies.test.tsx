@@ -35,12 +35,12 @@ import { parseReferentiel } from "@/lib/referentiel";
 
 function reference() {
   const result = parseReferentiel(
-    JSON.parse(readFileSync("public/data/referentiel_senbei.json", "utf8")) as unknown,
+    JSON.parse(readFileSync("src/test/fixtures-referentiel.json", "utf8")) as unknown,
   );
   if (!result.data) throw new Error("Référentiel invalide");
   return result.data;
 }
-const brut = JSON.parse(readFileSync("public/data/referentiel_senbei.json", "utf8")) as {
+const brut = JSON.parse(readFileSync("src/test/fixtures-referentiel.json", "utf8")) as {
   anomalies: { id: string; observations: { value: unknown; url: string }[] }[];
 };
 const entetes = (csv: string) =>

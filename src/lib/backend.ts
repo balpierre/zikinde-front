@@ -294,3 +294,51 @@ export async function getAnomalies(artistId: string): Promise<Anomaly[]> {
       .order("created_at", { ascending: false }),
   ) as Anomaly[];
 }
+
+// ------------------------------------------------------------------ imports manuels
+
+/** Nombre maximal de lignes acceptées par `create_manual_import`. */
+export const MAX_LIGNES_IMPORT = 20_000;
+
+export interface ManualImport {
+  id: string;
+  name: string;
+  filename: string | null;
+  columns: string[] | null;
+  row_count: number;
+  created_at: string;
+}
+
+export async function listManualImports(artistId: string): Promise<ManualImport[]> {
+  return unwrap(
+    await supabase()
+      .from("manual_imports")
+      .select("id, name, filename, columns, row_count, created_at")
+      .eq("org_artist_id", artistId)
+      .order("created_at", { ascending: false }),
+  ) as ManualImport[];
+}
+
+/** Crée un import manuel et met en file un job `reconcile` ; renvoie l'uuid de l'import. */
+export async function createManualImport(
+  artistId: string,
+  name: string,
+  filename: string,
+  rows: Record<string, string>[],
+): Promise<string> {
+  if (rows.length > MAX_LIGNES_IMPORT)
+    throw new Error(`Un import est limité à ${MAX_LIGNES_IMPORT} lignes.`);
+  return unwrap(
+    await supabase().rpc("create_manual_import", {
+      p_artist: artistId,
+      p_name: name,
+      p_filename: filename,
+      p_rows: rows,
+    }),
+  ) as string;
+}
+
+export async function deleteManualImport(importId: string): Promise<void> {
+  const { error } = await supabase().rpc("delete_manual_import", { p_import: importId });
+  check(error);
+}

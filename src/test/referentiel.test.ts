@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   bases,
-  correspondSenbei,
   couverture,
   dateFr,
   nombre,
@@ -9,15 +8,9 @@ import {
   typesNoeuds,
   typesSorties,
 } from "@/lib/libelles";
-import { parseReferentiel, plateformes } from "@/lib/referentiel";
+import { parseReferentiel, plateformes, sourcesMatrice } from "@/lib/referentiel";
 
 describe("Règles du référentiel", () => {
-  it("propose Senbeï pour senb et ne propose aucun autre artiste", () => {
-    expect(correspondSenbei("senb")).toBe(true);
-    expect(correspondSenbei("Senbeï")).toBe(true);
-    expect(correspondSenbei("autre artiste")).toBe(false);
-    expect(correspondSenbei("")).toBe(false);
-  });
   it("formate les milliers avec un espace français", () => {
     expect(nombre(23394)).toBe("23 394");
   });
@@ -71,5 +64,72 @@ describe("Règles du référentiel", () => {
     expect(platform?.category).toBe("streaming");
     expect(platform?.url).toBe("https://www.deezer.com/");
     expect(platform?.edge.label).toBe("Disponible sur");
+  });
+});
+
+describe("Référentiel issu du pipeline", () => {
+  it("affiche une source d’import sous son nom, sans planter hors des sources connues", () => {
+    const source = { source: "import:abc", url: "", fetched_at: "2026-11-21T10:00:00+00:00" };
+    const result = parseReferentiel({
+      meta: {
+        generated_at: "2026-11-21T10:00:00+00:00",
+        query: "Artiste",
+        pivot: "musicbrainz",
+        match: { method: "mbid", mbid: "x", candidates: [] },
+        sources: [
+          {
+            id: "musicbrainz",
+            label: "MusicBrainz",
+            url: "https://musicbrainz.org/",
+            fetched_at: "",
+          },
+          { id: "import:abc", label: "Catalogue label 2026", url: "", fetched_at: "" },
+        ],
+        model: {},
+        notes: [],
+      },
+      focus_artist: "artist:a",
+      stats: { nodes_by_type: { artist: 1, recording: 1 } },
+      nodes: [
+        { id: "artist:a", type: "artist", label: "Artiste", props: {}, sources: [source] },
+        { id: "recording:r", type: "recording", label: "Titre", props: {}, sources: [source] },
+      ],
+      edges: [
+        {
+          id: "e",
+          from: "artist:a",
+          to: "recording:r",
+          type: "performed",
+          label: "interprète",
+          basis: "declared",
+          rule: null,
+          props: {},
+          sources: [source],
+        },
+      ],
+      claims: [{ entity: "artist:a", field: "nom", value: "Artiste", ...source }],
+      matrix: [
+        {
+          field: "nom",
+          label: "Nom",
+          status: "concordant",
+          values: { musicbrainz: "Artiste", "import:abc": "Artiste" },
+        },
+      ],
+      genealogies: [],
+      anomalies: [],
+    });
+    expect(result.state).toBe("ready");
+    const data = result.data!;
+    expect(data.meta.sources?.map((s) => s.name)).toEqual(["MusicBrainz", "Catalogue label 2026"]);
+    expect(Object.keys(data.matrix[0]!.values)).toEqual(["MusicBrainz", "Catalogue label 2026"]);
+    expect(data.nodes[1]?.sources?.[0]?.name).toBe("Catalogue label 2026");
+    expect(sourcesMatrice(data)).toEqual([
+      "Wikidata",
+      "MusicBrainz",
+      "Deezer",
+      "Discogs",
+      "Catalogue label 2026",
+    ]);
   });
 });

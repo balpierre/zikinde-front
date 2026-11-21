@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { LoaderCircle } from "lucide-react";
 import {
@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Concepts, Shell, metadata } from "@/components/label-pulse/shared";
-import { correspondSenbei } from "@/lib/libelles";
 import { useSession } from "@/hooks/use-session";
 import {
   ensureOrganization,
@@ -39,7 +38,6 @@ function Index() {
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
   const { session } = useSession();
-  const found = correspondSenbei(query);
   const hasQuery = query.trim().length > 0;
 
   async function search() {
@@ -206,20 +204,6 @@ function Index() {
                     ))}
                   </>
                 )}
-                {found && (
-                  <Button asChild variant="ghost" className="artist-result">
-                    <Link to="/collecte/senbei">
-                      <span className="artist-avatar">
-                        <Database size={23} />
-                      </span>
-                      <span className="artist-result-name">
-                        <strong>Senbeï</strong>
-                        <span>Référentiel de démonstration</span>
-                      </span>
-                      <ArrowRight className="result-arrow" />
-                    </Link>
-                  </Button>
-                )}
               </div>
             )}
           </form>
@@ -228,15 +212,6 @@ function Index() {
               <Database size={13} /> Catalogue indépendant
             </span>
             <span className="mono">MUSICBRAINZ · DEEZER · SPOTIFY · YOUTUBE</span>
-          </div>
-          <div className="featured-artist">
-            <span className="featured-label">À EXPLORER</span>
-            <Button variant="link" asChild>
-              <Link to="/collecte/senbei">
-                Senbeï <ArrowUpRight size={16} />
-              </Link>
-            </Button>
-            <span className="featured-note">Quatre sources, une identité.</span>
           </div>
         </div>
         <div className="catalogue-mark" aria-hidden="true">

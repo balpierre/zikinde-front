@@ -8,7 +8,7 @@ import {
 import { parseReferentiel } from "@/lib/referentiel";
 import { droits } from "@/lib/libelles";
 function reference() {
-  const input: unknown = JSON.parse(readFileSync("public/data/referentiel_senbei.json", "utf8"));
+  const input: unknown = JSON.parse(readFileSync("src/test/fixtures-referentiel.json", "utf8"));
   const result = parseReferentiel(input);
   if (!result.data) throw new Error("Référentiel invalide");
   return result.data;
