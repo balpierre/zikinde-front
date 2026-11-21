@@ -31,6 +31,11 @@ use the editor.
 
 <!-- LOVABLE:END -->
 
+## Project reference
+
+Read `docs/projet.md` first: product idea, current scope, design direction and
+next steps.
+
 ## Application architecture
 
 - Keep the template’s TanStack Router for navigation; it preserves the supported SSR and file-route integration.

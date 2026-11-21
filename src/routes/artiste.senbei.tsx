@@ -16,6 +16,10 @@ import {
 } from "lucide-react";
 import { Graphe } from "@/components/label-pulse/graphe";
 import { Genealogie } from "@/components/label-pulse/genealogie";
+import { Anomalies } from "@/components/label-pulse/anomalies";
+import { ExportReferentiel } from "@/components/label-pulse/export-referentiel";
+import { useDecisions } from "@/hooks/use-decisions";
+import { etatLocal } from "@/lib/anomalies";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -36,16 +40,20 @@ import {
   sourcesCatalogue,
   type MatrixValue,
 } from "@/lib/referentiel";
-import { categories, statuts, nombre, couverture } from "@/lib/libelles";
+import { categories, statuts, statutsFermes, nombre, couverture } from "@/lib/libelles";
 
 interface ArtistSearch {
-  vue?: "genealogie" | "graphe";
+  vue?: "genealogie" | "graphe" | "anomalies";
   oeuvre?: string;
   anomalie?: string;
 }
 export const Route = createFileRoute("/artiste/senbei")({
   validateSearch: (search: Record<string, unknown>): ArtistSearch => ({
-    ...(search["vue"] === "genealogie" || search["vue"] === "graphe" ? { vue: search["vue"] } : {}),
+    ...(search["vue"] === "genealogie" ||
+    search["vue"] === "graphe" ||
+    search["vue"] === "anomalies"
+      ? { vue: search["vue"] }
+      : {}),
     ...(typeof search["oeuvre"] === "string" ? { oeuvre: search["oeuvre"] } : {}),
     ...(typeof search["anomalie"] === "string" ? { anomalie: search["anomalie"] } : {}),
   }),
@@ -90,6 +98,8 @@ function Artiste() {
   const navigate = useNavigate({ from: "/artiste/senbei" });
   const genealogyActive = search.vue === "genealogie";
   const graphActive = search.vue === "graphe";
+  const anomaliesActive = search.vue === "anomalies";
+  const overviewActive = !genealogyActive && !graphActive && !anomaliesActive;
   const { data: result } = useSuspenseQuery(referentielQuery);
   const { data } = result;
   const artist = data?.nodes.find((node) =>
@@ -97,9 +107,11 @@ function Artiste() {
   );
   const platforms = plateformes(data);
   const groups = [...new Set(platforms.map((p) => categories[p.category] ?? "Référentiel"))];
-  const openAnomalies = data?.anomalies.filter(
-    (a) => !["closed", "resolved", "fermée", "résolue"].includes(a.status),
-  ).length;
+  const sourceOpen = data?.anomalies.filter((a) => !statutsFermes.includes(a.status));
+  const openAnomalies = sourceOpen?.length;
+  const { decisions, modifier, persistant } = useDecisions(data?.meta.focus_artist ?? "senbei");
+  // Local decisions never close a source anomaly: they are counted apart.
+  const handled = sourceOpen?.filter((a) => etatLocal(decisions[a.id]) !== "a_traiter").length ?? 0;
   return (
     <Shell active="reference">
       <main className="content-page artist-page">
@@ -127,11 +139,14 @@ function Artiste() {
               ))}
             </div>
           </div>
-          <div className="identity-state">
-            <CircleAlert size={15} />
-            {openAnomalies == null
-              ? "Anomalies non renseignées"
-              : `${nombre(openAnomalies)} anomalie${openAnomalies > 1 ? "s" : ""} ouverte${openAnomalies > 1 ? "s" : ""}`}
+          <div className="identity-aside">
+            <div className="identity-state">
+              <CircleAlert size={15} />
+              {openAnomalies == null
+                ? "Anomalies non renseignées"
+                : `${nombre(openAnomalies)} anomalie${openAnomalies > 1 ? "s" : ""} ouverte${openAnomalies > 1 ? "s" : ""}${handled ? ` · dont ${nombre(handled)} traitée${handled > 1 ? "s" : ""} localement` : ""}`}
+            </div>
+            {data && <ExportReferentiel data={data} />}
           </div>
         </div>
         <Concepts compact />
@@ -139,8 +154,8 @@ function Artiste() {
           <Button
             variant="ghost"
             role="tab"
-            aria-selected={!genealogyActive && !graphActive}
-            className={!genealogyActive && !graphActive ? "active-tab" : ""}
+            aria-selected={overviewActive}
+            className={overviewActive ? "active-tab" : ""}
             onClick={() => void navigate({ search: {} })}
           >
             <Layers3 />
@@ -168,19 +183,17 @@ function Artiste() {
             <Network />
             Graphe
           </Button>
-          {[{ name: "Anomalies", Icon: CircleAlert }].map(({ name, Icon }) => (
-            <Tooltip key={name}>
-              <TooltipTrigger asChild>
-                <span tabIndex={0}>
-                  <Button variant="ghost" role="tab" disabled aria-selected="false">
-                    <Icon />
-                    {name}
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>Cette vue sera disponible ultérieurement.</TooltipContent>
-            </Tooltip>
-          ))}
+          <Button
+            variant="ghost"
+            role="tab"
+            aria-selected={anomaliesActive}
+            aria-controls="anomalies-panel"
+            className={anomaliesActive ? "active-tab" : ""}
+            onClick={() => void navigate({ search: { vue: "anomalies" } })}
+          >
+            <CircleAlert />
+            Anomalies
+          </Button>
         </div>
         {!data && <DataNotice state={result.state} />}
         {genealogyActive && data ? (
@@ -189,6 +202,7 @@ function Artiste() {
             selectedWork={search.oeuvre}
             selectedAnomaly={search.anomalie}
             onSelect={(id) => void navigate({ search: { vue: "genealogie", oeuvre: id } })}
+            onOpenAnomaly={(id) => void navigate({ search: { vue: "anomalies", anomalie: id } })}
             onAnomaly={(id) =>
               void navigate({
                 search: {
@@ -201,7 +215,18 @@ function Artiste() {
           />
         ) : graphActive && data ? (
           <Graphe data={data} />
-        ) : !genealogyActive && !graphActive ? (
+        ) : anomaliesActive && data ? (
+          <Anomalies
+            data={data}
+            selected={search.anomalie}
+            decisions={decisions}
+            modifier={modifier}
+            persistant={persistant}
+            onSelect={(id) =>
+              void navigate({ search: { vue: "anomalies", ...(id ? { anomalie: id } : {}) } })
+            }
+          />
+        ) : overviewActive ? (
           <>
             <section className="reference-section">
               <div className="section-heading">

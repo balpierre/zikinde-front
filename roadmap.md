@@ -1,4 +1,4 @@
-# Label Pulse
+# Zikindé
 
 - [x] Construire la recherche et la navigation en français.
 - [x] Construire la séquence des quatre sources et la vue d'ensemble.

@@ -86,6 +86,10 @@
   --graph-release: var(--release);
   --graph-person: oklch(0.75 0.065 35);
   --graph-edge: oklch(0.44 0.007 120);
+  --severity-haute: var(--destructive);
+  --severity-moyenne: oklch(0.8 0.11 85);
+  --severity-faible: var(--muted-foreground);
+  --severity-info: var(--quiet);
 }
 @layer base {
   * {
@@ -2141,5 +2145,499 @@ a.source-badge:hover {
   }
   .graph-properties > div {
     grid-template-columns: 95px minmax(0, 1fr);
+  }
+}
+
+/* Anomalies */
+.identity-aside {
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  margin-top: 26px;
+}
+.identity-aside .identity-state {
+  margin-top: 0;
+}
+.export-trigger {
+  font-size: 11px;
+}
+.export-menu {
+  max-width: 300px;
+}
+.export-count {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+.export-notice {
+  padding: 6px 8px 4px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+}
+.read-only-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 14px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--primary);
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--muted-foreground);
+}
+.read-only-notice svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--primary);
+}
+.read-only-notice.compact {
+  margin: 0 0 4px;
+  padding: 8px 10px;
+  font-size: 10px;
+}
+.read-only-notice.warning,
+.read-only-notice.warning svg {
+  border-left-color: var(--severity-haute);
+  color: var(--severity-haute);
+}
+.anomaly-filters {
+  align-items: center;
+  flex-wrap: wrap;
+}
+.anomaly-selects {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.anomaly-selects button[role="combobox"] {
+  width: auto;
+  min-width: 170px;
+  font-size: 11px;
+}
+.severity-dot {
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--severity-color, var(--quiet));
+}
+.severity-haute {
+  --severity-color: var(--severity-haute);
+}
+.severity-moyenne {
+  --severity-color: var(--severity-moyenne);
+}
+.severity-faible {
+  --severity-color: var(--severity-faible);
+}
+.severity-info {
+  --severity-color: var(--severity-info);
+}
+.severity-mark,
+.local-state {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.severity-mark {
+  color: var(--severity-color, var(--quiet));
+  border: 1px solid var(--severity-color, var(--border));
+}
+.local-state {
+  color: var(--muted-foreground);
+  border: 1px dashed var(--border);
+}
+.local-state.state-valeur_choisie,
+.local-state.state-demande_preparee {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+.local-state.state-ignoree {
+  color: var(--quiet);
+  text-decoration: line-through;
+}
+.anomalies-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  margin-top: 18px;
+}
+.anomalies-section.with-detail .anomalies-body {
+  grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.6fr);
+  align-items: start;
+}
+.anomaly-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.anomaly-list li + li {
+  border-top: 1px solid var(--border);
+}
+.anomaly-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 14px;
+  text-align: left;
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+}
+.anomaly-row:hover,
+.anomaly-row.selected {
+  background: var(--card);
+}
+.anomaly-row.selected {
+  box-shadow: inset 2px 0 0 var(--primary);
+}
+.anomaly-row:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.anomaly-row-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+.anomaly-row-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+.anomaly-row strong {
+  font-size: 13px;
+  font-weight: 550;
+}
+.anomaly-row-meta {
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+.anomaly-empty {
+  padding: 16px;
+}
+.anomaly-muted {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  line-height: 1.55;
+}
+.anomaly-detail {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  background: var(--card);
+  min-width: 0;
+}
+.anomaly-back {
+  padding: 0;
+  height: auto;
+  margin-bottom: 12px;
+}
+.anomaly-detail h2:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+.anomaly-detail-top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.anomaly-marks {
+  display: flex;
+  gap: 6px;
+}
+.anomaly-detail h2 {
+  margin-top: 12px;
+  font-size: 22px;
+  font-weight: 550;
+  line-height: 1.2;
+}
+.anomaly-type {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.anomaly-description {
+  margin-top: 14px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.anomaly-detail section {
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.anomaly-detail h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 550;
+}
+.anomaly-detail h3 .mono {
+  color: var(--muted-foreground);
+  font-size: 10px;
+  font-weight: 400;
+}
+.observation-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+.observation {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+}
+.observation strong {
+  font-size: 13px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.observation.chosen {
+  border-color: var(--primary);
+}
+.observation-chosen {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--primary);
+}
+.anomaly-items {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.anomaly-items th,
+.anomaly-items td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+.anomaly-items th {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 400;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.anomaly-items a {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--primary);
+}
+.anomaly-more {
+  padding: 8px 0 0;
+  height: auto;
+  font-size: 11px;
+}
+.anomaly-route {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+}
+.anomaly-route p {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.recipient-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.recipient-steps li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px 4px 4px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 11px;
+}
+.recipient-steps .mono {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--secondary);
+  font-size: 9px;
+}
+.decision-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+}
+.decision-summary > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--primary);
+}
+.decision-summary > div {
+  flex: 1;
+  min-width: 0;
+}
+.decision-summary p {
+  margin-top: 3px;
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+.decision-summary span {
+  font-size: 10px;
+  color: var(--quiet);
+}
+.decision-actions,
+.draft-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.anomaly-form {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+}
+.anomaly-form fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.anomaly-form legend,
+.anomaly-form label,
+.draft-label {
+  font-size: 11px;
+  font-weight: 500;
+}
+.anomaly-form textarea {
+  min-height: 80px;
+  font-size: 12px;
+}
+.anomaly-form .draft-message {
+  min-height: 150px;
+}
+.anomaly-form button[type="submit"] {
+  align-self: flex-start;
+}
+.anomaly-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+.anomaly-choice label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.anomaly-choice label span {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--muted-foreground);
+}
+.draft-current {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 11px;
+}
+.draft-current ul {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+.draft-current strong {
+  color: var(--foreground);
+  font-weight: 500;
+  margin-right: 6px;
+}
+.draft-current a {
+  color: var(--primary);
+}
+.drafts-export {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.drafts-export > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+}
+.drafts-export span {
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+@media (max-width: 1050px) {
+  .anomalies-section.with-detail .anomalies-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .anomalies-section.with-detail .anomaly-list {
+    display: none;
+  }
+  .identity-aside {
+    align-items: flex-start;
+  }
+}
+@media (max-width: 640px) {
+  .anomaly-selects button[role="combobox"] {
+    min-width: 0;
+    width: 100%;
+  }
+  .anomaly-selects > * {
+    flex: 1 1 100%;
+  }
+  .anomaly-detail {
+    padding: 14px;
+  }
+  .identity-aside {
+    margin-top: 0;
   }
 }
