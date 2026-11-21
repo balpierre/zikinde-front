@@ -52,14 +52,6 @@ export function dateFr(value: string | null | undefined): string {
         timeZone: "UTC",
       }).format(date);
 }
-export function correspondSenbei(query: string): boolean {
-  const normalized = query
-    .trim()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-  return normalized.length >= 2 && "senbei".startsWith(normalized);
-}
 export function couverture(
   covered: number | null | undefined,
   total: number | null | undefined,

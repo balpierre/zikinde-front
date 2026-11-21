@@ -10,8 +10,10 @@ import {
   CircleSlash,
   Clock,
   KeyRound,
+  Layers3,
   LoaderCircle,
   RefreshCw,
+  Upload,
   X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -169,10 +171,22 @@ function Extraction() {
             )}
           </p>
         </div>
-        <Button onClick={relaunch} disabled={active || relaunching} variant="outline">
-          <RefreshCw className={active || relaunching ? "animate-spin" : ""} /> Relancer
-          l’extraction
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <Link to="/artiste/$artistId" params={{ artistId }}>
+              <Layers3 /> Référentiel
+            </Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link to="/collecte/$artistId" params={{ artistId }}>
+              <Upload /> Sources & imports
+            </Link>
+          </Button>
+          <Button onClick={relaunch} disabled={active || relaunching} variant="outline">
+            <RefreshCw className={active || relaunching ? "animate-spin" : ""} /> Relancer
+            l’extraction
+          </Button>
+        </div>
       </div>
 
       <section className="mt-8" aria-labelledby="progress-title">

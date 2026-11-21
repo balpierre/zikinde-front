@@ -11,8 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ConnexionRouteImport } from './routes/connexion'
-import { Route as ArtisteSenbeiRouteImport } from './routes/artiste.senbei'
-import { Route as CollecteSenbeiRouteImport } from './routes/collecte.senbei'
+import { Route as ArtisteArtistIdRouteImport } from './routes/artiste.$artistId'
+import { Route as CollecteArtistIdRouteImport } from './routes/collecte.$artistId'
 import { Route as ExtractionsIndexRouteImport } from './routes/extractions.index'
 import { Route as ExtractionsArtistIdRouteImport } from './routes/extractions.$artistId'
 
@@ -26,14 +26,14 @@ const ConnexionRoute = ConnexionRouteImport.update({
   path: '/connexion',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ArtisteSenbeiRoute = ArtisteSenbeiRouteImport.update({
-  id: '/artiste/senbei',
-  path: '/artiste/senbei',
+const ArtisteArtistIdRoute = ArtisteArtistIdRouteImport.update({
+  id: '/artiste/$artistId',
+  path: '/artiste/$artistId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CollecteSenbeiRoute = CollecteSenbeiRouteImport.update({
-  id: '/collecte/senbei',
-  path: '/collecte/senbei',
+const CollecteArtistIdRoute = CollecteArtistIdRouteImport.update({
+  id: '/collecte/$artistId',
+  path: '/collecte/$artistId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ExtractionsIndexRoute = ExtractionsIndexRouteImport.update({
@@ -50,16 +50,16 @@ const ExtractionsArtistIdRoute = ExtractionsArtistIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/connexion': typeof ConnexionRoute
-  '/artiste/senbei': typeof ArtisteSenbeiRoute
-  '/collecte/senbei': typeof CollecteSenbeiRoute
+  '/artiste/$artistId': typeof ArtisteArtistIdRoute
+  '/collecte/$artistId': typeof CollecteArtistIdRoute
   '/extractions/$artistId': typeof ExtractionsArtistIdRoute
   '/extractions/': typeof ExtractionsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/connexion': typeof ConnexionRoute
-  '/artiste/senbei': typeof ArtisteSenbeiRoute
-  '/collecte/senbei': typeof CollecteSenbeiRoute
+  '/artiste/$artistId': typeof ArtisteArtistIdRoute
+  '/collecte/$artistId': typeof CollecteArtistIdRoute
   '/extractions/$artistId': typeof ExtractionsArtistIdRoute
   '/extractions': typeof ExtractionsIndexRoute
 }
@@ -67,8 +67,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/connexion': typeof ConnexionRoute
-  '/artiste/senbei': typeof ArtisteSenbeiRoute
-  '/collecte/senbei': typeof CollecteSenbeiRoute
+  '/artiste/$artistId': typeof ArtisteArtistIdRoute
+  '/collecte/$artistId': typeof CollecteArtistIdRoute
   '/extractions/$artistId': typeof ExtractionsArtistIdRoute
   '/extractions/': typeof ExtractionsIndexRoute
 }
@@ -77,24 +77,24 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/connexion'
-    | '/artiste/senbei'
-    | '/collecte/senbei'
+    | '/artiste/$artistId'
+    | '/collecte/$artistId'
     | '/extractions/$artistId'
     | '/extractions/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/connexion'
-    | '/artiste/senbei'
-    | '/collecte/senbei'
+    | '/artiste/$artistId'
+    | '/collecte/$artistId'
     | '/extractions/$artistId'
     | '/extractions'
   id:
     | '__root__'
     | '/'
     | '/connexion'
-    | '/artiste/senbei'
-    | '/collecte/senbei'
+    | '/artiste/$artistId'
+    | '/collecte/$artistId'
     | '/extractions/$artistId'
     | '/extractions/'
   fileRoutesById: FileRoutesById
@@ -102,8 +102,8 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ConnexionRoute: typeof ConnexionRoute
-  ArtisteSenbeiRoute: typeof ArtisteSenbeiRoute
-  CollecteSenbeiRoute: typeof CollecteSenbeiRoute
+  ArtisteArtistIdRoute: typeof ArtisteArtistIdRoute
+  CollecteArtistIdRoute: typeof CollecteArtistIdRoute
   ExtractionsArtistIdRoute: typeof ExtractionsArtistIdRoute
   ExtractionsIndexRoute: typeof ExtractionsIndexRoute
 }
@@ -124,18 +124,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConnexionRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/artiste/senbei': {
-      id: '/artiste/senbei'
-      path: '/artiste/senbei'
-      fullPath: '/artiste/senbei'
-      preLoaderRoute: typeof ArtisteSenbeiRouteImport
+    '/artiste/$artistId': {
+      id: '/artiste/$artistId'
+      path: '/artiste/$artistId'
+      fullPath: '/artiste/$artistId'
+      preLoaderRoute: typeof ArtisteArtistIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/collecte/senbei': {
-      id: '/collecte/senbei'
-      path: '/collecte/senbei'
-      fullPath: '/collecte/senbei'
-      preLoaderRoute: typeof CollecteSenbeiRouteImport
+    '/collecte/$artistId': {
+      id: '/collecte/$artistId'
+      path: '/collecte/$artistId'
+      fullPath: '/collecte/$artistId'
+      preLoaderRoute: typeof CollecteArtistIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/extractions/': {
@@ -158,8 +158,8 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ConnexionRoute: ConnexionRoute,
-  ArtisteSenbeiRoute: ArtisteSenbeiRoute,
-  CollecteSenbeiRoute: CollecteSenbeiRoute,
+  ArtisteArtistIdRoute: ArtisteArtistIdRoute,
+  CollecteArtistIdRoute: CollecteArtistIdRoute,
   ExtractionsArtistIdRoute: ExtractionsArtistIdRoute,
   ExtractionsIndexRoute: ExtractionsIndexRoute,
 }

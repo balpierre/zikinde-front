@@ -1,8 +1,9 @@
 import { queryOptions } from "@tanstack/react-query";
-import { createIsomorphicFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { nombre, valeurFr } from "./libelles";
+import { supabase } from "./supabase";
 
+/** Sources historiques du pipeline, affichées en premier ; les imports manuels s’ajoutent après. */
 export const SOURCES = ["Wikidata", "MusicBrainz", "Deezer", "Discogs"] as const;
 export type SourceName = (typeof SOURCES)[number];
 export interface Source {
@@ -39,7 +40,8 @@ export interface MatrixRow {
   field: string;
   label: string;
   status: "concordant" | "divergent" | "source_unique" | "absent";
-  values: Partial<Record<SourceName, MatrixValue>>;
+  /** Valeurs indexées par nom de source (libellé de `meta.sources`). */
+  values: Record<string, MatrixValue>;
 }
 export interface Node {
   id: string;
@@ -202,23 +204,35 @@ const rawSchema = z.object({
   meta: z.object({
     generated_at: z.string(),
     query: z.string(),
-    pivot: z.string(),
-    match: z.object({ method: z.string(), mbid: z.string(), candidates: z.array(z.string()) }),
+    pivot: z.string().nullish(),
+    match: z
+      .object({
+        method: z.string().nullish(),
+        mbid: z.string().nullish(),
+        candidates: z.array(z.string()).optional(),
+      })
+      .passthrough()
+      .nullish(),
     sources: z.array(
-      z.object({ id: z.string(), label: z.string(), url: z.string(), fetched_at: z.string() }),
+      z.object({
+        id: z.string(),
+        label: z.string(),
+        url: z.string().default(""),
+        fetched_at: z.string().default(""),
+      }),
     ),
-    model: z.record(z.string()),
-    notes: z.array(z.string()),
+    model: z.record(z.unknown()).optional(),
+    notes: z.array(z.string()).default([]),
   }),
   focus_artist: z.string(),
   stats: z
     .object({
-      nodes_by_type: z.record(z.number()),
-      edges: z.number(),
-      claims: z.number(),
-      anomalies: z.number(),
-      recordings_with_isrc: z.number(),
-      works_with_iswc: z.number(),
+      nodes_by_type: z.record(z.number()).default({}),
+      edges: z.number().optional(),
+      claims: z.number().optional(),
+      anomalies: z.number().optional(),
+      recordings_with_isrc: z.number().optional(),
+      works_with_iswc: z.number().optional(),
     })
     .passthrough(),
   nodes: z.array(
@@ -231,8 +245,8 @@ const rawSchema = z.object({
       to: z.string(),
       type: z.string(),
       label: z.string(),
-      basis: z.enum(["declared", "inferred"]),
-      rule: z.string().nullable(),
+      basis: z.enum(["declared", "inferred"]).default("declared"),
+      rule: z.string().nullish(),
       props,
       sources: rawSources,
     }),
@@ -272,14 +286,16 @@ const rawSchema = z.object({
       type: z.string(),
       severity: z.string(),
       title: z.string(),
-      description: z.string(),
+      description: z.string().default(""),
       entity: z.string(),
-      field: z.string(),
+      field: z.string().default(""),
       status: z.string(),
-      observations: z.array(z.object({ source: z.string(), value, url: z.string() })),
-      target: z.string(),
-      suggested_action: z.string(),
-      items: z.array(z.record(z.unknown())),
+      observations: z
+        .array(z.object({ source: z.string(), value, url: z.string().default("") }))
+        .default([]),
+      target: z.string().default(""),
+      suggested_action: z.string().default(""),
+      items: z.array(z.record(z.unknown())).default([]),
     }),
   ),
 });
@@ -335,10 +351,9 @@ function normaliser(raw: ReferentielFichier): Referentiel {
   });
   const matrix: MatrixRow[] = raw.matrix.map((row) => {
     const values: MatrixRow["values"] = {};
-    for (const name of SOURCES) {
-      const sourceId = raw.meta.sources.find((s) => s.label === name)?.id;
-      const cellValue = sourceId ? row.values[sourceId] : undefined;
-      if (cellValue === undefined) continue;
+    // Les clés sont des ids de source (y compris `import:<uuid>`) ; on affiche leur libellé.
+    for (const [sourceId, cellValue] of Object.entries(row.values)) {
+      const name = sourceLabels.get(sourceId) ?? sourceId;
       const cellClaims = raw.claims.filter(
         (c) => c.entity === raw.focus_artist && c.field === row.field && c.source === sourceId,
       );
@@ -392,9 +407,11 @@ function normaliser(raw: ReferentielFichier): Referentiel {
       works: raw.stats.nodes_by_type["work"] ?? 0,
       recordings: raw.stats.nodes_by_type["recording"] ?? 0,
       releases: raw.stats.nodes_by_type["release"] ?? 0,
-      anomalies: raw.stats.anomalies,
-      works_with_iswc: raw.stats.works_with_iswc,
-      recordings_with_isrc: raw.stats.recordings_with_isrc,
+      anomalies: raw.stats.anomalies ?? raw.anomalies.length,
+      ...(raw.stats.works_with_iswc != null ? { works_with_iswc: raw.stats.works_with_iswc } : {}),
+      ...(raw.stats.recordings_with_isrc != null
+        ? { recordings_with_isrc: raw.stats.recordings_with_isrc }
+        : {}),
     },
     matrix,
     nodes,
@@ -438,30 +455,33 @@ export function parseReferentiel(input: unknown): ReferentielResult {
   if (!parsed.success) return { data: null, state: "invalid" };
   return { data: parsed.data as Referentiel, state: "ready" };
 }
-const charger = createIsomorphicFn()
-  .server(async (): Promise<ReferentielResult> => {
-    const fichier = await import("../../public/data/referentiel_senbei.json");
-    return parseReferentiel(fichier.default);
-  })
-  .client(async (): Promise<ReferentielResult> => {
-    try {
-      const response = await fetch("/data/referentiel_senbei.json");
-      if (response.status === 404 || response.headers.get("content-type")?.includes("text/html"))
-        return { data: null, state: "missing" };
-      if (!response.ok) return { data: null, state: "unavailable" };
-      return parseReferentiel(await response.json());
-    } catch {
-      return { data: null, state: "unavailable" };
-    }
+/** Référentiel calculé par le worker pour un artiste suivi (table `artist_referentials`). */
+async function charger(artistId: string): Promise<ReferentielResult> {
+  const { data, error } = await supabase()
+    .from("artist_referentials")
+    .select("data, built_at")
+    .eq("org_artist_id", artistId)
+    .maybeSingle();
+  if (error) return { data: null, state: "unavailable" };
+  if (!data) return { data: null, state: "missing" };
+  return parseReferentiel((data as { data: unknown }).data);
+}
+export const referentielQuery = (artistId: string) =>
+  queryOptions({
+    queryKey: ["referentiel", artistId],
+    queryFn: () => charger(artistId),
+    staleTime: 0,
+    refetchOnMount: "always",
+    retry: false,
   });
-export const referentielQuery = queryOptions({
-  queryKey: ["referentiel", "senbei"],
-  queryFn: charger,
-  staleTime: 0,
-  refetchOnMount: "always",
-  retry: false,
-});
-export function sourceInfo(data: Referentiel | null, name: SourceName): Source | undefined {
+/** Sources de la matrice : les quatre historiques d’abord, puis les autres (imports…). */
+export function sourcesMatrice(data: Referentiel | null): string[] {
+  const noms = new Set<string>(SOURCES);
+  for (const s of data?.meta.sources ?? []) noms.add(s.name);
+  for (const row of data?.matrix ?? []) for (const name of Object.keys(row.values)) noms.add(name);
+  return [...noms];
+}
+export function sourceInfo(data: Referentiel | null, name: string): Source | undefined {
   return data?.meta.sources?.find((s) => s.name.toLowerCase() === name.toLowerCase());
 }
 export function plateformes(
