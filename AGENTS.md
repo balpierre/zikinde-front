@@ -57,3 +57,5 @@ use the editor.
 - Parcours : recherche → job `discover` → l'utilisateur choisit le bon compte (jamais de présélection) →
   `track_artist` → progression en direct du job `collect` → résultats.
 - Les pages `/collecte/senbei` et `/artiste/senbei` restent la démonstration statique du référentiel.
+- Déploiement : `scripts/deploy-cloudflare.sh` (Cloudflare Workers, domaine `zikinde.claves-technologies.fr`,
+  prérequis `npx wrangler@4 login`). Pas de Lovable pour la mise en ligne.
