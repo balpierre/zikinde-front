@@ -16,7 +16,7 @@ export const Route = createFileRoute("/connexion")({
         ? search["redirect"]
         : "/extractions",
   }),
-  head: () => metadata("Connexion", "Connectez-vous à Label Pulse pour lancer des extractions."),
+  head: () => metadata("Connexion", "Connectez-vous à Zikindé pour lancer des extractions."),
   component: Connexion,
 });
 

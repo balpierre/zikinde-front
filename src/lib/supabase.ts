@@ -4,7 +4,8 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 // Surchargeables par VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY. Ne jamais mettre ici la clé service_role.
 const env = import.meta.env as Record<string, string | undefined>;
 const SUPABASE_URL: string = env["VITE_SUPABASE_URL"] ?? "https://lqqueunulkuknknjwrcf.supabase.co";
-const SUPABASE_KEY: string = env["VITE_SUPABASE_PUBLISHABLE_KEY"] ?? "sb_publishable_h-f6retr42Gx8pmE6zeL_A__K0P9bRF";
+const SUPABASE_KEY: string =
+  env["VITE_SUPABASE_PUBLISHABLE_KEY"] ?? "sb_publishable_h-f6retr42Gx8pmE6zeL_A__K0P9bRF";
 
 let client: SupabaseClient | undefined;
 
