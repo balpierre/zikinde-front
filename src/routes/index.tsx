@@ -56,7 +56,8 @@ function Index() {
   const found = correspondSenbei(query);
   const hasQuery = query.trim().length > 0;
   const identifiant = detectIdentifier(query);
-  // Identifiers are looked up in every loaded referential, without a backend round trip.
+  // Identifiers are looked up in the static referential (the only one the app loads today),
+  // without a backend round trip.
   const referentiels = useQuery({ ...referentielQuery, enabled: identifiant !== null });
   const resultats =
     identifiant && referentiels.data?.data

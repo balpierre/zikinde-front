@@ -611,12 +611,12 @@ export function Anomalies({
   decisions,
   modifier,
   persistant,
-  correction = false,
+  correction,
   onSelect,
 }: {
   data: Referentiel;
   selected: string | undefined;
-  correction?: boolean;
+  correction?: string | undefined;
   decisions: Decisions;
   modifier: Modifier;
   persistant: boolean;
@@ -792,7 +792,7 @@ export function Anomalies({
             artiste={artiste}
             modifier={modifier}
             masquee={!liste.includes(anomaly)}
-            correction={correction}
+            correction={correction === anomaly.id}
             onClose={() => fermer(anomaly.id)}
           />
         )}

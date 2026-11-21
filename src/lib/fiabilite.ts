@@ -51,7 +51,8 @@ function jauge(
   explication: string,
 ): Jauge | null {
   if (denominateur <= 0) return null;
-  const pourcentage = Math.round((numerateur / denominateur) * 100);
+  // A stats total larger than the counted nodes must not show more than 100 %.
+  const pourcentage = Math.round((Math.min(numerateur, denominateur) / denominateur) * 100);
   return {
     id,
     libelle,
@@ -279,5 +280,6 @@ export function getDivergentFields(data: Referentiel): ChampDivergent[] {
         valeurs,
         ...(anomalie ? { anomalie: { id: anomalie.id, label: anomalie.label } } : {}),
       };
-    });
+    })
+    .filter((champ) => champ.valeurs.length >= 2);
 }

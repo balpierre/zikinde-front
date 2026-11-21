@@ -64,8 +64,7 @@ export function IsrcDouble({
               variant="outline"
               size="icon"
               aria-label="Cas précédent"
-              disabled={index === 0}
-              onClick={() => setIndex((i) => Math.max(i - 1, 0))}
+              onClick={() => setIndex((i) => (i - 1 + cas.length) % cas.length)}
             >
               <ChevronLeft />
             </Button>
@@ -77,8 +76,7 @@ export function IsrcDouble({
               variant="outline"
               size="icon"
               aria-label="Cas suivant"
-              disabled={index >= cas.length - 1}
-              onClick={() => setIndex((i) => Math.min(i + 1, cas.length - 1))}
+              onClick={() => setIndex((i) => (i + 1) % cas.length)}
             >
               <ChevronRight />
             </Button>

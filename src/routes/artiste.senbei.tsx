@@ -56,7 +56,7 @@ interface ArtistSearch {
   vue?: "genealogie" | "graphe" | "anomalies";
   oeuvre?: string;
   anomalie?: string;
-  correction?: boolean;
+  correction?: string;
   type?: "recording" | "release";
   entite?: string;
 }
@@ -73,7 +73,7 @@ export const Route = createFileRoute("/artiste/senbei")({
       ? { type: search["type"] }
       : {}),
     ...(typeof search["entite"] === "string" ? { entite: search["entite"] } : {}),
-    ...(search["correction"] === true || search["correction"] === "1" ? { correction: true } : {}),
+    ...(typeof search["correction"] === "string" ? { correction: search["correction"] } : {}),
   }),
   head: () =>
     metadata(
@@ -124,6 +124,7 @@ function Artiste() {
     data.meta.focus_artist ? node.id === data.meta.focus_artist : node.type === "artist",
   );
   const platforms = plateformes(data);
+  const couches = data ? getIcebergCounts(data) : [];
   const divergents = new Map((data ? getDivergentFields(data) : []).map((c) => [c.field, c]));
   const groups = [...new Set(platforms.map((p) => categories[p.category] ?? "Référentiel"))];
   const sourceOpen = data?.anomalies.filter((a) => !statutsFermes.includes(a.status));
@@ -244,7 +245,7 @@ function Artiste() {
           <Anomalies
             data={data}
             selected={search.anomalie}
-            correction={search.correction ?? false}
+            correction={search.correction}
             decisions={decisions}
             modifier={modifier}
             persistant={persistant}
@@ -258,7 +259,7 @@ function Artiste() {
               <IsrcDouble
                 cas={getDuplicateIsrcCases(data)}
                 onCorriger={(id) =>
-                  void navigate({ search: { vue: "anomalies", anomalie: id, correction: true } })
+                  void navigate({ search: { vue: "anomalies", anomalie: id, correction: id } })
                 }
               />
             )}
@@ -468,7 +469,7 @@ function Artiste() {
                 ))}
               </div>
             </section>
-            {data && (
+            {couches.some((c) => c.nombre > 0) && (
               <section className="reference-section">
                 <div className="section-heading">
                   <div>
@@ -478,7 +479,7 @@ function Artiste() {
                   <span className="section-detail">Œuvre, enregistrement, sortie</span>
                 </div>
                 <Iceberg
-                  couches={getIcebergCounts(data)}
+                  couches={couches}
                   onOuvrir={(type) =>
                     void navigate({
                       search: type === "work" ? { vue: "genealogie" } : { vue: "graphe", type },
