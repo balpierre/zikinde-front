@@ -26,7 +26,7 @@ export const Route = createFileRoute("/")({
   head: () =>
     metadata(
       "Recherche d’artiste",
-      "Recherchez un artiste dans Label Pulse, le référentiel vérifiable de catalogue pour les labels indépendants.",
+      "Recherchez un artiste dans Zikindé, le référentiel vérifiable de catalogue pour les labels indépendants.",
     ),
   component: Index,
 });
@@ -241,7 +241,7 @@ function Index() {
         </div>
         <div className="catalogue-mark" aria-hidden="true">
           <div className="mark-top mono">
-            <span>LP—001</span>
+            <span>ZK—001</span>
             <span>RÉFÉRENTIEL</span>
           </div>
           <svg

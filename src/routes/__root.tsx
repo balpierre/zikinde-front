@@ -83,13 +83,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Label Pulse" },
+      { title: "Zikindé" },
       {
         name: "description",
         content: "Référentiel vérifiable de catalogue musical pour les labels indépendants.",
       },
-      { name: "author", content: "Label Pulse" },
-      { property: "og:title", content: "Label Pulse" },
+      { name: "author", content: "Zikindé" },
+      { property: "og:title", content: "Zikindé" },
       {
         property: "og:description",
         content: "Référentiel vérifiable de catalogue musical pour les labels indépendants.",

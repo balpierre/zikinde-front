@@ -13,17 +13,17 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { dateFr } from "@/lib/libelles";
+import { dateFr, mentionLectureSeule } from "@/lib/libelles";
 import type { Source } from "@/lib/referentiel";
 import { useSession } from "@/hooks/use-session";
 import { signOut } from "@/lib/backend";
 
 export function PulseLogo() {
   return (
-    <Link to="/" className="brand" aria-label="Label Pulse — accueil">
+    <Link to="/" className="brand" aria-label="Zikindé — accueil">
       <AudioLines aria-hidden="true" />
       <span>
-        label<span className="brand-accent">pulse</span>
+        zik<span className="brand-accent">indé</span>
         <span className="brand-dot">.</span>
       </span>
     </Link>
@@ -88,7 +88,7 @@ export function Shell({
         {children}
         <footer className="site-footer">
           <span>
-            Label Pulse <span className="footer-separator">/</span> Référentiel musical indépendant
+            Zikindé <span className="footer-separator">/</span> Référentiel musical indépendant
           </span>
           <span>
             <ShieldCheck size={14} /> Des données, pas des suppositions.
@@ -192,6 +192,14 @@ export function SourceBadges({ sources }: { sources?: Source[] }) {
     </span>
   ) : null;
 }
+export function LectureSeule({ compact = false }: { compact?: boolean }) {
+  return (
+    <p className={`read-only-notice ${compact ? "compact" : ""}`} role="note">
+      <ShieldCheck size={compact ? 13 : 15} aria-hidden="true" />
+      <span>{mentionLectureSeule}</span>
+    </p>
+  );
+}
 export function DataNotice({ state }: { state: string }) {
   return (
     <div className="data-notice" role="status">
@@ -240,9 +248,9 @@ export function PageNotFound() {
 export function metadata(title: string, description: string) {
   return {
     meta: [
-      { title: `${title} — Label Pulse` },
+      { title: `${title} — Zikindé` },
       { name: "description", content: description },
-      { property: "og:title", content: `${title} — Label Pulse` },
+      { property: "og:title", content: `${title} — Zikindé` },
       { property: "og:description", content: description },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

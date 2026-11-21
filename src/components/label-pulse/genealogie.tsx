@@ -26,7 +26,16 @@ import {
   type ConnexionGenealogie,
 } from "@/lib/genealogie";
 import type { Referentiel } from "@/lib/referentiel";
-import { dateObjet, droits, nombre, regleFr, typesNoeuds, typesSorties } from "@/lib/libelles";
+import {
+  dateObjet,
+  droits,
+  gravites,
+  nombre,
+  regleFr,
+  statutsSource,
+  typesNoeuds,
+  typesSorties,
+} from "@/lib/libelles";
 
 const columnInfo = [
   { name: "Œuvre", type: "work", code: "ISWC", Icon: FileMusic },
@@ -191,12 +200,14 @@ export function Genealogie({
   selectedAnomaly,
   onSelect,
   onAnomaly,
+  onOpenAnomaly,
 }: {
   data: Referentiel;
   selectedWork: string | undefined;
   selectedAnomaly: string | undefined;
   onSelect: (id: string) => void;
   onAnomaly: (id?: string) => void;
+  onOpenAnomaly?: (id: string) => void;
 }) {
   const selected = oeuvreSelectionnee(data, selectedWork);
   const graphRef = useRef<HTMLDivElement>(null);
@@ -330,20 +341,31 @@ export function Genealogie({
         <DialogContent className="genealogy-anomaly-dialog">
           <DialogHeader>
             <span className="eyebrow">
-              ANOMALIE {anomaly?.id} · {anomaly?.status}
+              ANOMALIE {anomaly?.id} ·{" "}
+              {(statutsSource[anomaly?.status ?? ""] ?? "Statut non renseigné").toUpperCase()}
             </span>
             <DialogTitle>{anomaly?.label}</DialogTitle>
             <DialogDescription>
               {anomaly?.description ?? "Aucun détail complémentaire renseigné."}
             </DialogDescription>
           </DialogHeader>
-          {anomaly?.severity && <p className="anomaly-severity">Gravité : {anomaly.severity}</p>}
+          {anomaly?.severity && (
+            <p className="anomaly-severity">
+              Gravité : {gravites[anomaly.severity] ?? "non renseignée"}
+            </p>
+          )}
           <SourceBadges sources={anomaly?.sources ?? []} />
           {anomaly?.suggested_action && (
             <section className="anomaly-action">
               <h3>Action suggérée</h3>
               <p>{anomaly.suggested_action}</p>
             </section>
+          )}
+          {anomaly && onOpenAnomaly && (
+            <Button variant="outline" onClick={() => onOpenAnomaly(anomaly.id)}>
+              Traiter dans l’onglet Anomalies
+              <ArrowRight />
+            </Button>
           )}
         </DialogContent>
       </Dialog>

@@ -19,6 +19,7 @@ export interface Meta {
   genres?: string[];
   collected_at?: string;
   sources?: Source[];
+  notes?: string[];
 }
 export interface Stats {
   works?: number;
@@ -81,6 +82,14 @@ export interface Anomaly {
   status: string;
   node_ids?: string[];
   sources?: Source[];
+  type?: string;
+  field?: string;
+  target?: string;
+  observations?: Observation[];
+}
+export interface Observation {
+  source: Source;
+  value: string | number | string[] | null;
 }
 export interface Referentiel {
   meta: Meta;
@@ -112,6 +121,7 @@ const schema = z.object({
     description: z.string().optional(),
     genres: z.array(z.string()).optional(),
     collected_at: z.string().optional(),
+    notes: z.array(z.string()).optional(),
     sources,
   }),
   stats: z.object({
@@ -179,6 +189,10 @@ const schema = z.object({
       status: z.string(),
       node_ids: z.array(z.string()).optional(),
       sources,
+      type: z.string().optional(),
+      field: z.string().optional(),
+      target: z.string().optional(),
+      observations: z.array(z.object({ source, value })).optional(),
     }),
   ),
 });
@@ -371,6 +385,7 @@ function normaliser(raw: ReferentielFichier): Referentiel {
         : {}),
       genres,
       collected_at: raw.meta.generated_at,
+      notes: raw.meta.notes,
       sources: metaSources,
     },
     stats: {
@@ -386,24 +401,34 @@ function normaliser(raw: ReferentielFichier): Referentiel {
     edges,
     claims,
     genealogies,
-    anomalies: raw.anomalies.map((a) => ({
-      id: a.id,
-      label: a.title,
-      description: a.description,
-      suggested_action: a.suggested_action,
-      severity: a.severity,
-      items: a.items,
-      status: a.status,
-      node_ids: [a.entity],
-      sources: a.observations.map((o) => {
+    anomalies: raw.anomalies.map((a) => {
+      const observations: Observation[] = a.observations.map((o) => {
         const meta = raw.meta.sources.find((s) => s.id === o.source);
         return {
-          name: meta?.label ?? "Source non identifiée",
-          source_url: o.url,
-          ...(meta ? { collected_at: meta.fetched_at } : {}),
+          source: {
+            name: meta?.label ?? "Source non identifiée",
+            source_url: o.url,
+            ...(meta ? { collected_at: meta.fetched_at } : {}),
+          },
+          value: o.value,
         };
-      }),
-    })),
+      });
+      return {
+        id: a.id,
+        label: a.title,
+        description: a.description,
+        suggested_action: a.suggested_action,
+        severity: a.severity,
+        items: a.items,
+        status: a.status,
+        node_ids: [a.entity],
+        sources: observations.map((o) => o.source),
+        type: a.type,
+        field: a.field,
+        target: a.target,
+        observations,
+      };
+    }),
   };
 }
 export function parseReferentiel(input: unknown): ReferentielResult {

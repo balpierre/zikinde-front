@@ -202,3 +202,85 @@ export function proprieteFr(field: string, value: unknown): string {
     );
   return valeurFr(field, value);
 }
+
+export const gravites: Record<string, string> = {
+  haute: "Haute",
+  moyenne: "Moyenne",
+  faible: "Faible",
+  info: "Info",
+};
+export const typesAnomalies: Record<string, string> = {
+  label_divergent: "Label divergent",
+  identifiant_divergent: "Identifiant divergent",
+  valeur_divergente: "Valeur divergente",
+  doublon_lien: "Lien en double",
+  isrc_manquant: "ISRC manquant",
+  sortie_absente: "Sortie absente",
+  oeuvre_sans_iswc: "Œuvre sans ISWC",
+  oeuvre_non_documentee: "Œuvre non documentée",
+  duree_divergente: "Durée divergente",
+  isrc_titres_differents: "ISRC à titres différents",
+  isrc_double: "ISRC en double",
+  date_divergente: "Date divergente",
+  fiabilite_source: "Fiabilité de la source",
+};
+export function libelleTypeAnomalie(type: string | undefined): string {
+  if (!type) return "Type non renseigné";
+  return typesAnomalies[type] ?? "Autre type d’anomalie";
+}
+export const statutsFermes = ["closed", "resolved", "fermée", "résolue"];
+export const destinataires: Record<string, string> = {
+  interne: "Interne (label / éditeur)",
+  distributeur: "Distributeur",
+  musicbrainz: "MusicBrainz",
+  wikidata: "Wikidata",
+  discogs: "Discogs",
+};
+export const etatsLocaux: Record<string, string> = {
+  a_traiter: "À traiter",
+  valeur_choisie: "Valeur choisie",
+  demande_preparee: "Demande préparée",
+  ignoree: "Ignorée",
+};
+export const statutsSource: Record<string, string> = {
+  ouverte: "Ouverte",
+  open: "Ouverte",
+  fermée: "Fermée",
+  closed: "Fermée",
+  résolue: "Résolue",
+  resolved: "Résolue",
+};
+export const mentionLectureSeule =
+  "Zikindé ne modifie jamais directement les plateformes tierces : les décisions restent dans ce navigateur et les demandes de correction sont des brouillons à transmettre vous-même.";
+// Anomaly items reuse short source keys; "label" is the title of the concerned object there.
+const colonnesElements: Record<string, string> = {
+  label: "Titre",
+  isrc_deezer: "ISRC Deezer",
+  deezer_s: "Durée Deezer",
+  musicbrainz_s: "Durée MusicBrainz",
+  isrc_1: "ISRC 1",
+  isrc_2: "ISRC 2",
+  sorties_1: "Sorties de l’ISRC 1",
+  sorties_2: "Sorties de l’ISRC 2",
+  deezer: "Deezer",
+  musicbrainz: "MusicBrainz",
+};
+export function libelleColonneElement(key: string): string {
+  return colonnesElements[key] ?? champs[key] ?? libelleChamp(key);
+}
+export function valeurElement(key: string, value: unknown): string {
+  if (["deezer_s", "musicbrainz_s"].includes(key) && typeof value === "number")
+    return proprieteFr("duree_s", value);
+  if (typeof value === "string" && /^\d{4}-\d{2}(-\d{2})?$/.test(value)) return dateObjet(value);
+  return proprieteFr(key, value);
+}
+export const typesNoeudsPluriel: Record<string, string> = {
+  work: "Œuvres",
+  recording: "Enregistrements",
+  release: "Sorties",
+  artist: "Artistes",
+  group: "Groupes",
+  person: "Personnes",
+  label: "Labels",
+  platform: "Plateformes",
+};
