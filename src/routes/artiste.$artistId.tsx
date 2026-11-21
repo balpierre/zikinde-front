@@ -109,6 +109,7 @@ function Artiste() {
   const query = useQuery(referentielQuery(artistId));
   const result = query.data ?? { data: null, state: query.isError ? "unavailable" : "loading" };
   const { data } = result;
+  const setAside = data?.meta.set_aside ?? [];
   const sources = sourcesMatrice(data);
   const artist = data?.nodes.find((node) =>
     data.meta.focus_artist ? node.id === data.meta.focus_artist : node.type === "artist",
@@ -162,6 +163,15 @@ function Artiste() {
           </Button>
         </div>
       </div>
+      {setAside.length > 0 && (
+        <p role="status" className="mt-4 rounded-lg border p-3 text-sm">
+          {nombre(setAside.length)} compte{setAside.length > 1 ? "s" : ""} mis de côté : ils
+          n’alimentent pas ce référentiel.{" "}
+          <Link to="/extractions/$artistId" params={{ artistId }} className="underline">
+            Les examiner
+          </Link>
+        </p>
+      )}
       <Concepts compact />
       <div className="artist-tabs" role="tablist" aria-label="Vues du référentiel">
         <Button

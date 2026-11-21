@@ -13,6 +13,17 @@ export interface Source {
   count?: number;
   contribution?: string;
 }
+/** Compte mis de côté (homonyme probable ou refusé par un humain) : il n’alimente pas le référentiel. */
+export interface SetAside {
+  link_id: number;
+  source: string;
+  source_id: string;
+  name: string;
+  url?: string | null;
+  status: string;
+  reason?: string | null;
+  score?: number | null;
+}
 export interface Meta {
   focus_artist?: string;
   artist_name?: string;
@@ -21,6 +32,7 @@ export interface Meta {
   collected_at?: string;
   sources?: Source[];
   notes?: string[];
+  set_aside?: SetAside[];
 }
 export interface Stats {
   works?: number;
@@ -125,6 +137,22 @@ const schema = z.object({
     collected_at: z.string().optional(),
     notes: z.array(z.string()).optional(),
     sources,
+    // Lu avec tolérance : un élément mal formé ne doit pas rendre tout le référentiel « invalide ».
+    set_aside: z
+      .array(
+        z.object({
+          link_id: z.number(),
+          source: z.string(),
+          source_id: z.string(),
+          name: z.string(),
+          url: z.string().nullish(),
+          status: z.string(),
+          reason: z.string().nullish(),
+          score: z.number().nullish(),
+        }),
+      )
+      .optional()
+      .catch(undefined),
   }),
   stats: z.object({
     works: z.number().optional(),

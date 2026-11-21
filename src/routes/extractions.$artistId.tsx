@@ -9,6 +9,7 @@ import {
   CircleDashed,
   CircleSlash,
   Clock,
+  EllipsisVertical,
   KeyRound,
   Layers3,
   LoaderCircle,
@@ -20,6 +21,22 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Table,
   TableBody,
   TableCell,
@@ -30,13 +47,19 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Shell, metadata } from "@/components/label-pulse/shared";
 import { RequireAuth } from "@/components/extractions/require-auth";
+import { ComptesSources, RevueEtat } from "@/components/extractions/comptes-sources";
+import { useRevue, type Revue } from "@/hooks/use-revue";
 import {
   countCatalog,
+  decideLink,
   getAnomalies,
   getArtist,
   getCatalog,
   getSourceAccounts,
+  getTitleLinks,
   refreshArtist,
+  requestReconcile,
+  waitJob,
   watchJob,
   type CatalogItem,
   type CatalogType,
@@ -49,12 +72,12 @@ import {
   artistesStatuts,
   dureeFr,
   etapesStatuts,
-  methodeLien,
   nomSource,
   ordreSources,
   typesCatalogue,
 } from "@/lib/extraction-libelles";
 import { dateFr, nombre } from "@/lib/libelles";
+import { referentielQuery } from "@/lib/referentiel";
 
 export const Route = createFileRoute("/extractions/$artistId")({
   ssr: false,
@@ -207,7 +230,17 @@ function Extraction() {
         )}
       </section>
 
-      {!active && a.status === "ready" && <Results artistId={artistId} knownIds={a.known_ids} />}
+      {!active && a.status === "ready" && (
+        <Results
+          artistId={artistId}
+          knownIds={a.known_ids}
+          onCollecte={() => {
+            // Une collecte complète vient d’être relancée (réintégration d’un compte) : on suit son job.
+            setJob(null);
+            void queryClient.invalidateQueries({ queryKey: ["artiste", artistId] });
+          }}
+        />
+      )}
     </>
   );
 }
@@ -272,11 +305,22 @@ function stepDetail(step: StepInfo): string {
   return step.error?.split("\n")[0] ?? "";
 }
 
-function Results({ artistId, knownIds }: { artistId: string; knownIds: Record<string, string[]> }) {
+function Results({
+  artistId,
+  knownIds,
+  onCollecte,
+}: {
+  artistId: string;
+  knownIds: Record<string, string[]>;
+  onCollecte: () => void;
+}) {
   const accounts = useQuery({
     queryKey: ["resultats", artistId, "comptes"],
     queryFn: () => getSourceAccounts(artistId),
   });
+  const referential = useQuery(referentielQuery(artistId));
+  const setAside = referential.data?.data?.meta.set_aside ?? [];
+  const revue = useRevue(artistId);
   const counts = useQuery({
     queryKey: ["resultats", artistId, "compteurs"],
     queryFn: () => countCatalog(artistId),
@@ -306,29 +350,15 @@ function Results({ artistId, knownIds }: { artistId: string; knownIds: Record<st
             )),
           )}
         </div>
-        {accounts.data && accounts.data.length > 0 && (
-          <ul className="mt-4 grid gap-2 sm:grid-cols-2">
-            {accounts.data.map((acc) => (
-              <li key={`${acc.source}-${acc.source_id}`} className="rounded-lg border p-3 text-sm">
-                <strong>{nomSource(acc.source)}</strong> — {acc.name}{" "}
-                {acc.url && (
-                  <a
-                    href={acc.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center underline"
-                  >
-                    voir <ArrowUpRight size={12} />
-                  </a>
-                )}
-                <div className="text-xs text-muted-foreground">
-                  Compte {methodeLien(acc.method)}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
       </section>
+
+      <RevueEtat revue={revue} />
+      <ComptesSources
+        comptes={accounts.data ?? []}
+        setAside={setAside}
+        revue={revue}
+        onCollecte={onCollecte}
+      />
 
       <section className="mt-10" aria-labelledby="anomalies-title">
         <h2 id="anomalies-title" className="mb-3 text-lg font-semibold">
@@ -384,7 +414,7 @@ function Results({ artistId, knownIds }: { artistId: string; knownIds: Record<st
           </TabsList>
           {(["recording", "release", "release_group", "work"] as CatalogType[]).map((t) => (
             <TabsContent key={t} value={t}>
-              <CatalogTable artistId={artistId} type={t} />
+              <CatalogTable artistId={artistId} type={t} revue={revue} />
             </TabsContent>
           ))}
         </Tabs>
@@ -483,12 +513,25 @@ function identifier(item: CatalogItem, scheme: string): string {
     .join(", ");
 }
 
-function CatalogTable({ artistId, type }: { artistId: string; type: CatalogType }) {
+function CatalogTable({
+  artistId,
+  type,
+  revue,
+}: {
+  artistId: string;
+  type: CatalogType;
+  revue: Revue;
+}) {
   const items = useQuery({
     queryKey: ["resultats", artistId, "catalogue", type],
     queryFn: () => getCatalog(artistId, type),
   });
+  const titleLinks = useQuery({
+    queryKey: ["resultats", artistId, "liens-titres"],
+    queryFn: () => getTitleLinks(artistId),
+  });
   const [filter, setFilter] = useState("");
+  const [aExclure, setAExclure] = useState<{ linkId: number; item: CatalogItem } | null>(null);
   const rows = useMemo(() => {
     const f = filter.trim().toLowerCase();
     return (items.data ?? []).filter(
@@ -524,6 +567,7 @@ function CatalogTable({ artistId, type }: { artistId: string; type: CatalogType 
         </TableHeader>
         <TableBody>
           {rows.map((item) => {
+            const linkId = titleLinks.data?.[`${item.source}|${item.source_id}`] ?? null;
             const attrs = item.attributes;
             const date = (attrs["date"] ?? attrs["first_release_date"] ?? attrs["release_date"]) as
               string | undefined;
@@ -546,16 +590,38 @@ function CatalogTable({ artistId, type }: { artistId: string; type: CatalogType 
                   {type === "recording" ? dureeFr(duration) : (date ?? "—")}
                 </TableCell>
                 <TableCell>
-                  {item.url && (
-                    <a
-                      href={item.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label={`Ouvrir ${item.name} sur ${nomSource(item.source)}`}
-                    >
-                      <ArrowUpRight size={14} />
-                    </a>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {item.url && (
+                      <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label={`Ouvrir ${item.name} sur ${nomSource(item.source)}`}
+                      >
+                        <ArrowUpRight size={14} />
+                      </a>
+                    )}
+                    {linkId != null && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            disabled={revue.enCours !== null}
+                            aria-label={`Actions pour ${item.name}`}
+                          >
+                            <EllipsisVertical size={14} />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onSelect={() => setAExclure({ linkId, item })}>
+                            Ce titre n’est pas de cet artiste
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             );
@@ -563,6 +629,36 @@ function CatalogTable({ artistId, type }: { artistId: string; type: CatalogType 
         </TableBody>
       </Table>
       {rows.length === 0 && <p className="py-4 text-sm text-muted-foreground">Aucun élément.</p>}
+      <AlertDialog open={aExclure !== null} onOpenChange={(open) => !open && setAExclure(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Retirer ce titre de cet artiste ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              « {aExclure?.item.name} » ({nomSource(aExclure?.item.source ?? "")}) ne sera plus
+              rattaché à cet artiste. Le référentiel sera recalculé.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const cible = aExclure;
+                setAExclure(null);
+                if (!cible) return;
+                void revue.lancer("Retrait du titre en cours…", async () => {
+                  await decideLink(cible.linkId, "rejected");
+                  const job = await waitJob(await requestReconcile(artistId));
+                  if (job.status === "error") {
+                    throw new Error(job.error?.split("\n")[0] ?? "La mise à jour a échoué.");
+                  }
+                });
+              }}
+            >
+              Retirer ce titre
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

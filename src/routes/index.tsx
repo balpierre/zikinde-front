@@ -50,6 +50,9 @@ function Index() {
   const visiblePhase = searchLabel === organization?.id ? phase : "idle";
   const busy = visiblePhase === "searching" || visiblePhase === "starting";
   const hasQuery = query.trim().length > 0;
+  // Plusieurs candidats au même nom : l’utilisateur doit comparer pays et dates avant de choisir.
+  const nomsEnDouble =
+    new Set(candidates.map((c) => c.name.trim().toLowerCase())).size < candidates.length;
 
   async function search() {
     const name = query.trim();
@@ -207,6 +210,11 @@ function Index() {
                     <div className="px-4 pt-3 text-xs text-muted-foreground">
                       Choisissez le bon artiste : une ressemblance de nom n’est pas une preuve.
                     </div>
+                    {nomsEnDouble && (
+                      <div role="status" className="px-4 pt-1 text-xs font-medium text-amber-700">
+                        Plusieurs artistes portent ce nom : vérifiez le pays et les dates.
+                      </div>
+                    )}
                     {candidates.map((c) => (
                       <Button
                         key={c.source_id}
@@ -224,6 +232,12 @@ function Index() {
                             {[
                               c.evidence.type,
                               c.evidence.area,
+                              c.evidence.country && c.evidence.country !== c.evidence.area
+                                ? `pays ${c.evidence.country}`
+                                : null,
+                              c.evidence.life_span?.begin
+                                ? `début ${c.evidence.life_span.begin}`
+                                : null,
                               c.evidence.disambiguation,
                               c.evidence.aliases?.length
                                 ? `alias ${c.evidence.aliases.join(", ")}`
