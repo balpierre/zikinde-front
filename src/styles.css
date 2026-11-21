@@ -2521,6 +2521,23 @@ a.source-badge:hover {
   font-size: 10px;
   color: var(--quiet);
 }
+.ai-explanation-warning {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--warning, var(--primary));
+}
+.ai-evidence {
+  margin: 6px 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+.ai-evidence .mono {
+  font-size: 11px;
+  color: inherit;
+}
 .decision-actions,
 .draft-actions {
   display: flex;
