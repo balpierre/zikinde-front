@@ -90,6 +90,10 @@
   --severity-moyenne: oklch(0.8 0.11 85);
   --severity-faible: var(--muted-foreground);
   --severity-info: var(--quiet);
+  --warning: var(--severity-moyenne);
+  --level-bon: var(--primary);
+  --level-surveiller: var(--warning);
+  --level-faible: var(--destructive);
 }
 @layer base {
   * {
@@ -2639,5 +2643,99 @@ a.source-badge:hover {
   }
   .identity-aside {
     margin-top: 0;
+  }
+}
+
+/* Reliability gauges: the level is always written next to its color. */
+.gauges {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 4px 0 22px;
+}
+.gauge {
+  --gauge-color: var(--level-bon);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+}
+.gauge-surveiller {
+  --gauge-color: var(--level-surveiller);
+}
+.gauge-faible {
+  --gauge-color: var(--level-faible);
+}
+.gauge-ring {
+  width: 76px;
+  height: 76px;
+  flex-shrink: 0;
+  transform: rotate(-90deg);
+}
+.gauge-track,
+.gauge-value {
+  fill: none;
+  stroke-width: 7;
+}
+.gauge-track {
+  stroke: var(--secondary);
+}
+.gauge-value {
+  stroke: var(--gauge-color);
+  stroke-linecap: round;
+  animation: gauge-fill 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes gauge-fill {
+  from {
+    stroke-dashoffset: var(--gauge-full);
+  }
+  to {
+    stroke-dashoffset: var(--gauge-offset);
+  }
+}
+.gauge-percent {
+  transform: rotate(90deg);
+  transform-origin: 42px 42px;
+  fill: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 600;
+}
+.gauge-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.gauge-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.gauge-label svg {
+  color: var(--muted-foreground);
+}
+.gauge-detail {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.gauge-level {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--gauge-color);
+}
+.gauge-tooltip {
+  max-width: 280px;
+}
+@media (max-width: 900px) {
+  .gauges {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

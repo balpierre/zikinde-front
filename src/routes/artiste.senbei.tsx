@@ -18,6 +18,7 @@ import { Graphe } from "@/components/label-pulse/graphe";
 import { Genealogie } from "@/components/label-pulse/genealogie";
 import { Anomalies } from "@/components/label-pulse/anomalies";
 import { ExportReferentiel } from "@/components/label-pulse/export-referentiel";
+import { Jauges } from "@/components/label-pulse/jauges";
 import { useDecisions } from "@/hooks/use-decisions";
 import { etatLocal } from "@/lib/anomalies";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,7 @@ import {
   type MatrixValue,
 } from "@/lib/referentiel";
 import { categories, statuts, statutsFermes, nombre, couverture } from "@/lib/libelles";
+import { getGauges } from "@/lib/fiabilite";
 
 interface ArtistSearch {
   vue?: "genealogie" | "graphe" | "anomalies";
@@ -149,6 +151,7 @@ function Artiste() {
             {data && <ExportReferentiel data={data} />}
           </div>
         </div>
+        {data && <Jauges jauges={getGauges(data)} />}
         <Concepts compact />
         <div className="artist-tabs" role="tablist" aria-label="Vues du référentiel">
           <Button
