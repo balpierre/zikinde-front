@@ -13,7 +13,7 @@ import { libelleChamp, libelleRelation, proprieteFr } from "@/lib/libelles";
 import { parseReferentiel, type Claim } from "@/lib/referentiel";
 function reference() {
   const result = parseReferentiel(
-    JSON.parse(readFileSync("public/data/referentiel_senbei.json", "utf8")) as unknown,
+    JSON.parse(readFileSync("src/test/fixtures-referentiel.json", "utf8")) as unknown,
   );
   if (!result.data) throw new Error("Référentiel invalide");
   return result.data;
@@ -27,7 +27,7 @@ describe("Graphe du catalogue", () => {
       .map((e) => (e.source === graph.focus ? e.target : e.source));
     const ids = (type: string) =>
       new Set(graph.nodes.filter((n) => n.type === type).map((n) => n.id));
-    expect(graph.focus).toBe("artist:senbei");
+    expect(graph.focus).toBe("artist:demo");
     expect(ids("artist")).toEqual(new Set([graph.focus, ...nearby]));
     for (const type of ["work", "group", "label", "platform"])
       expect(ids(type).size).toBe(data.nodes.filter((n) => n.type === type).length);
@@ -58,21 +58,21 @@ describe("Graphe du catalogue", () => {
         .filter((e) => e.type === "released_by" && pseudo.some((n) => n.id === e.target))
         .map((e) => e.source),
     );
-    const sansLabel = relationsViaSorties(fusion, "artist:senbei").find(
+    const sansLabel = relationsViaSorties(fusion, "artist:demo").find(
       (e) => e.target === SANS_LABEL,
     );
     expect(libelleRelation(sansLabel!.type, sansLabel!.label)).toBe("sorties sans label");
     expect(new Set(sansLabel?.via)).toEqual(
       new Set(
         [...releases].filter((r) =>
-          data.edges.some((e) => e.source === "artist:senbei" && e.target === r),
+          data.edges.some((e) => e.source === "artist:demo" && e.target === r),
         ),
       ),
     );
   });
   it("relie les labels par un raccourci de relations déclarées", () => {
     const data = reference();
-    const via = relationsViaSorties(data, "artist:senbei");
+    const via = relationsViaSorties(data, "artist:demo");
     expect(via.length).toBeGreaterThan(0);
     for (const edge of via) {
       expect(edge.basis).toBe("declared");
@@ -80,7 +80,7 @@ describe("Graphe du catalogue", () => {
       for (const release of edge.via ?? []) {
         expect(
           data.edges.some(
-            (e) => e.source === "artist:senbei" && e.target === release && e.basis !== "inferred",
+            (e) => e.source === "artist:demo" && e.target === release && e.basis !== "inferred",
           ),
         ).toBe(true);
         expect(
@@ -91,7 +91,7 @@ describe("Graphe du catalogue", () => {
       }
     }
   });
-  it("garde Senbeï au centre même sans le filtre artiste", () => {
+  it("garde l’artiste suivi au centre même sans le filtre artiste", () => {
     const data = reference();
     const graph = selectionGraphe(data, ["work"], false);
     expect(new Set(graph.nodes.map((n) => n.id))).toEqual(
@@ -100,17 +100,17 @@ describe("Graphe du catalogue", () => {
   });
   it("exclut les participations inférées du raccourci via sorties", () => {
     const data = reference();
-    const [label] = relationsViaSorties(data, "artist:senbei");
+    const [label] = relationsViaSorties(data, "artist:demo");
     const release = label!.via![0]!;
     const inferee = {
       ...data,
       edges: data.edges.map((e) =>
-        e.source === "artist:senbei" && e.target === release
+        e.source === "artist:demo" && e.target === release
           ? { ...e, basis: "inferred" as const }
           : e,
       ),
     };
-    const apres = relationsViaSorties(inferee, "artist:senbei").find(
+    const apres = relationsViaSorties(inferee, "artist:demo").find(
       (e) => e.target === label!.target,
     );
     expect(apres?.via ?? []).not.toContain(release);
@@ -175,7 +175,7 @@ describe("Graphe du catalogue", () => {
     expect(selection.edges.every((e) => !e.via)).toBe(true);
   });
   it("signale seulement les affirmations réellement divergentes", () => {
-    const groups = affirmationsGroupees(reference(), "artist:senbei");
+    const groups = affirmationsGroupees(reference(), "artist:demo");
     expect(groups.find((g) => g.field === "ville")?.etat).toBe("divergent");
     expect(groups.find((g) => g.field === "id_apple-music")?.etat).toBe("divergent");
     expect(groups.find((g) => g.field === "pays")?.etat).toBe("concordant");
@@ -284,11 +284,11 @@ describe("Graphe du catalogue", () => {
   it("réunit les sources des deux étapes du raccourci via sorties", () => {
     const data = reference();
     const cle = (s: { name: string; source_url: string }) => `${s.name}|${s.source_url}`;
-    for (const edge of relationsViaSorties(data, "artist:senbei")) {
+    for (const edge of relationsViaSorties(data, "artist:demo")) {
       const attendues = data.edges
         .filter(
           (e) =>
-            (e.source === "artist:senbei" && edge.via!.includes(e.target)) ||
+            (e.source === "artist:demo" && edge.via!.includes(e.target)) ||
             (e.type === "released_by" && edge.via!.includes(e.source) && e.target === edge.target),
         )
         .flatMap((e) => e.sources ?? [])

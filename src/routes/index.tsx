@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { LoaderCircle } from "lucide-react";
 import {
   ArrowRight,
@@ -15,11 +15,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { OrganizationSelect } from "@/components/extractions/organization-select";
 import { Concepts, Shell, metadata } from "@/components/label-pulse/shared";
-import { correspondSenbei } from "@/lib/libelles";
 import { referentielQuery } from "@/lib/referentiel";
 import { detectIdentifier, findByIdentifier, messageIntrouvable } from "@/lib/identifiants";
 import { useSession } from "@/hooks/use-session";
 import {
+  listArtists,
   organizationsQuery,
   organizationSearch,
   selectOrganization,
@@ -53,21 +53,34 @@ function Index() {
   const organization = selectOrganization(organizations.data, label);
   const visiblePhase = searchLabel === organization?.id ? phase : "idle";
   const busy = visiblePhase === "searching" || visiblePhase === "starting";
-  const found = correspondSenbei(query);
   const hasQuery = query.trim().length > 0;
   const identifiant = detectIdentifier(query);
-  // Identifiers are looked up in the static referential (the only one the app loads today),
-  // without a backend round trip.
-  const referentiels = useQuery({ ...referentielQuery, enabled: identifiant !== null });
-  const resultats =
-    identifiant && referentiels.data?.data
-      ? findByIdentifier([referentiels.data.data], identifiant)
-      : [];
+  // Identifiers are looked up in the referentials of every artist the selected label follows.
+  const orgId = identifiant && session ? organization?.id : undefined;
+  const artistes = useQuery({
+    queryKey: ["artistes", session?.user.id, orgId],
+    queryFn: () => (orgId ? listArtists(orgId) : []),
+    enabled: Boolean(orgId),
+  });
+  const referentiels = useQueries({
+    queries: (orgId ? (artistes.data ?? []) : []).map((a) => referentielQuery(a.id)),
+  });
+  const chargement =
+    Boolean(orgId) && (artistes.isPending || referentiels.some((r) => r.isPending));
+  const disponibles = (artistes.data ?? []).flatMap((a, i) => {
+    const data = referentiels[i]?.data?.data;
+    return data ? [{ artistId: a.id, data }] : [];
+  });
+  const resultats = identifiant ? findByIdentifier(disponibles, identifiant) : [];
 
   function ouvrir(index: number) {
     const resultat = resultats[index];
     if (!resultat) return;
-    void navigate({ to: "/artiste/senbei", search: resultat.cible });
+    void navigate({
+      to: "/artiste/$artistId",
+      params: { artistId: resultat.artistId },
+      search: resultat.cible,
+    });
   }
 
   async function search() {
@@ -193,27 +206,48 @@ function Index() {
               <div id="artist-results" className="search-results" aria-live="polite">
                 {identifiant && (
                   <>
-                    {referentiels.isPending && (
+                    {!session && (
+                      <div className="empty-result">
+                        <span>
+                          Connectez-vous pour chercher un {identifiant.code} dans vos référentiels
+                        </span>
+                        <Button type="button" size="sm" asChild>
+                          <Link to="/connexion" search={{ redirect: "/" }}>
+                            Se connecter <ArrowRight />
+                          </Link>
+                        </Button>
+                      </div>
+                    )}
+                    {chargement && (
                       <div className="empty-result">
                         <span className="flex items-center gap-2">
                           <LoaderCircle className="animate-spin" size={16} />
-                          Recherche de l’{identifiant.code} dans le référentiel…
+                          Recherche de l’{identifiant.code} dans les référentiels…
                         </span>
                       </div>
                     )}
-                    {!referentiels.isPending && !referentiels.data?.data && (
+                    {orgId && !chargement && artistes.isError && (
                       <div className="empty-result">
-                        <span>Le référentiel est indisponible pour le moment.</span>
+                        <span>Les référentiels sont indisponibles pour le moment.</span>
                       </div>
                     )}
-                    {referentiels.data?.data && resultats.length === 0 && (
+                    {orgId && !chargement && !artistes.isError && resultats.length === 0 && (
                       <div className="empty-result" role="status">
                         <span>{messageIntrouvable(identifiant)}</span>
                       </div>
                     )}
                     {resultats.map((r) => (
-                      <Button key={r.noeud.id} asChild variant="ghost" className="artist-result">
-                        <Link to="/artiste/senbei" search={r.cible}>
+                      <Button
+                        key={`${r.artistId}|${r.noeud.id}`}
+                        asChild
+                        variant="ghost"
+                        className="artist-result"
+                      >
+                        <Link
+                          to="/artiste/$artistId"
+                          params={{ artistId: r.artistId }}
+                          search={r.cible}
+                        >
                           <span className="artist-avatar">
                             <Fingerprint size={23} />
                           </span>
@@ -302,20 +336,6 @@ function Index() {
                     ))}
                   </>
                 )}
-                {found && (
-                  <Button asChild variant="ghost" className="artist-result">
-                    <Link to="/collecte/senbei">
-                      <span className="artist-avatar">
-                        <Database size={23} />
-                      </span>
-                      <span className="artist-result-name">
-                        <strong>Senbeï</strong>
-                        <span>Référentiel de démonstration</span>
-                      </span>
-                      <ArrowRight className="result-arrow" />
-                    </Link>
-                  </Button>
-                )}
               </div>
             )}
           </form>
@@ -327,15 +347,6 @@ function Index() {
               <Database size={13} /> Catalogue indépendant
             </span>
             <span className="mono">MUSICBRAINZ · DEEZER · SPOTIFY · YOUTUBE</span>
-          </div>
-          <div className="featured-artist">
-            <span className="featured-label">À EXPLORER</span>
-            <Button variant="link" asChild>
-              <Link to="/collecte/senbei">
-                Senbeï <ArrowUpRight size={16} />
-              </Link>
-            </Button>
-            <span className="featured-note">Quatre sources, une identité.</span>
           </div>
         </div>
         <div className="catalogue-mark" aria-hidden="true">

@@ -34,7 +34,8 @@ export function selectionGraphe(
   const focus =
     data.meta.focus_artist ??
     data.nodes.find((n) => n.props["focus"] === true)?.id ??
-    "artist:senbei";
+    data.nodes.find((n) => n.type === "artist")?.id ??
+    "";
   const nearby = new Set(
     data.edges
       .filter((e) => e.type === "related_to" && (e.source === focus || e.target === focus))

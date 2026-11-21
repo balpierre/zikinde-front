@@ -10,8 +10,10 @@ import {
   CircleSlash,
   Clock,
   KeyRound,
+  Layers3,
   LoaderCircle,
   RefreshCw,
+  Upload,
   X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -169,10 +171,22 @@ function Extraction() {
             )}
           </p>
         </div>
-        <Button onClick={relaunch} disabled={active || relaunching} variant="outline">
-          <RefreshCw className={active || relaunching ? "animate-spin" : ""} /> Relancer
-          l’extraction
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <Link to="/artiste/$artistId" params={{ artistId }}>
+              <Layers3 /> Référentiel
+            </Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link to="/collecte/$artistId" params={{ artistId }}>
+              <Upload /> Sources & imports
+            </Link>
+          </Button>
+          <Button onClick={relaunch} disabled={active || relaunching} variant="outline">
+            <RefreshCw className={active || relaunching ? "animate-spin" : ""} /> Relancer
+            l’extraction
+          </Button>
+        </div>
       </div>
 
       <section className="mt-8" aria-labelledby="progress-title">
@@ -332,8 +346,17 @@ function Results({ artistId, knownIds }: { artistId: string; knownIds: Record<st
           {anomalies.data?.map((an) => (
             <li key={an.id} className="flex gap-3 rounded-lg border p-3 text-sm">
               <AlertTriangle size={18} className="shrink-0 text-amber-600" />
-              <div>
-                <strong>{anomaliesTypes[an.kind] ?? an.kind}</strong>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <strong>
+                    {typeof an.details["title"] === "string"
+                      ? an.details["title"]
+                      : (anomaliesTypes[an.kind] ?? an.kind)}
+                  </strong>
+                  <span className="rounded border px-1.5 text-xs text-muted-foreground">
+                    {graviteFr[an.severity] ?? an.severity}
+                  </span>
+                </div>
                 <AnomalyDetails details={an.details} />
               </div>
             </li>
@@ -370,6 +393,25 @@ function Results({ artistId, knownIds }: { artistId: string; knownIds: Record<st
   );
 }
 
+const graviteFr: Record<string, string> = {
+  error: "gravité haute",
+  warning: "gravité moyenne",
+  info: "information",
+};
+
+interface Observation {
+  source?: string;
+  value?: unknown;
+  url?: string;
+}
+
+function texte(v: unknown): string {
+  if (v == null) return "—";
+  if (Array.isArray(v)) return v.map(texte).join(", ");
+  if (typeof v === "object") return JSON.stringify(v);
+  return String(v);
+}
+
 function AnomalyDetails({ details }: { details: Record<string, unknown> }) {
   const values = details["values"];
   if (details["scheme"] && values && typeof values === "object") {
@@ -382,7 +424,56 @@ function AnomalyDetails({ details }: { details: Record<string, unknown> }) {
       </div>
     );
   }
-  return <pre className="mono text-xs text-muted-foreground">{JSON.stringify(details)}</pre>;
+  const description = details["description"];
+  const action = details["suggested_action"];
+  const target = details["target"];
+  const observations = Array.isArray(details["observations"])
+    ? (details["observations"] as Observation[])
+    : [];
+  const items = Array.isArray(details["items"]) ? (details["items"] as unknown[]) : [];
+  return (
+    <div className="mt-1 grid gap-1.5 text-muted-foreground">
+      {typeof description === "string" && <p>{description}</p>}
+      {observations.length > 0 && (
+        <ul className="grid gap-0.5">
+          {observations.map((o, i) => (
+            <li key={i} className="break-words">
+              <span className="font-medium text-foreground">{nomSource(o.source ?? "")}</span> :{" "}
+              {o.url ? (
+                <a href={o.url} target="_blank" rel="noreferrer" className="underline">
+                  {texte(o.value)}
+                </a>
+              ) : (
+                texte(o.value)
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {items.length > 0 && (
+        <details>
+          <summary className="cursor-pointer">{items.length} élément(s) concerné(s)</summary>
+          <ul className="mt-1 grid max-h-64 gap-0.5 overflow-auto text-xs">
+            {items.map((it, i) => (
+              <li key={i} className="break-words">
+                {it && typeof it === "object"
+                  ? Object.entries(it as Record<string, unknown>)
+                      .map(([k, v]) => `${k} : ${texte(v)}`)
+                      .join(" · ")
+                  : texte(it)}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {typeof action === "string" && (
+        <p>
+          <span className="font-medium text-foreground">À faire</span>
+          {typeof target === "string" && target ? ` (${target})` : ""} : {action}
+        </p>
+      )}
+    </div>
+  );
 }
 
 function identifier(item: CatalogItem, scheme: string): string {

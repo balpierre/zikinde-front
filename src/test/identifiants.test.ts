@@ -4,7 +4,7 @@ import { parseReferentiel, type Referentiel } from "@/lib/referentiel";
 import { detectIdentifier, findByIdentifier, messageIntrouvable } from "@/lib/identifiants";
 import { selectionGraphe } from "@/lib/graphe";
 
-const fichier: unknown = JSON.parse(readFileSync("public/data/referentiel_senbei.json", "utf8"));
+const fichier: unknown = JSON.parse(readFileSync("src/test/fixtures-referentiel.json", "utf8"));
 function reference(): Referentiel {
   const result = parseReferentiel(fichier);
   if (!result.data) throw new Error(`Référentiel non chargé : ${result.state}`);
@@ -13,7 +13,7 @@ function reference(): Referentiel {
 function chercher(query: string) {
   const identifiant = detectIdentifier(query);
   if (!identifiant) throw new Error(`Identifiant non reconnu : ${query}`);
-  return findByIdentifier([reference()], identifiant);
+  return findByIdentifier([{ artistId: "demo", data: reference() }], identifiant);
 }
 
 describe("Détection des identifiants", () => {
@@ -48,7 +48,8 @@ describe("Recherche par identifiant dans le référentiel", () => {
   it("trouve l’enregistrement d’un ISRC et l’ouvre dans le graphe", () => {
     const [resultat] = chercher("FRPHC2000053");
     expect(resultat?.typeObjet).toBe("Enregistrement");
-    expect(resultat?.artiste).toBe("Senbeï");
+    expect(resultat?.artistId).toBe("demo");
+    expect(resultat?.artiste).toBe("Artiste Démo");
     expect(resultat?.cible).toEqual({ vue: "graphe", entite: "recording:FRPHC2000053" });
   });
   it("trouve l’œuvre d’un ISWC et ouvre sa généalogie", () => {
@@ -59,7 +60,17 @@ describe("Recherche par identifiant dans le référentiel", () => {
   });
   it("trouve une sortie par son UPC ou son code-barres", () => {
     expect(chercher("3663729402950")[0]?.titre).toBe("Rêves");
-    expect(chercher("3618112645940")).toHaveLength(1);
+    const data = reference();
+    data.nodes.push({
+      id: "release:ean",
+      type: "release",
+      label: "EAN",
+      props: { barcode: "0036000291452" },
+    });
+    const ean = detectIdentifier("036000291452");
+    expect(ean && findByIdentifier([{ artistId: "demo", data }], ean)[0]?.noeud.id).toBe(
+      "release:ean",
+    );
   });
   it("signale un identifiant bien formé mais introuvable", () => {
     expect(chercher("FRXXX9999999")).toEqual([]);

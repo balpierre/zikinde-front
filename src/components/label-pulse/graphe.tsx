@@ -506,7 +506,7 @@ export function Graphe({
       <div className="graph-heading">
         <div>
           <span className="eyebrow">CARTOGRAPHIE DU CATALOGUE</span>
-          <h2>Autour de Senbeï</h2>
+          <h2>Autour de {data.meta.artist_name ?? "l’artiste"}</h2>
         </div>
         <span className="graph-count" aria-live="polite">
           {nombre(projection.nodes.length)} nœuds · {nombre(projection.edges.length)} relations
@@ -548,7 +548,7 @@ export function Graphe({
             className="graph-canvas"
             ref={container}
             role="img"
-            aria-label={`Graphe de Senbeï, ${projection.nodes.length} nœuds, ${projection.edges.length} relations`}
+            aria-label={`Graphe de ${data.meta.artist_name ?? "l’artiste"}, ${projection.nodes.length} nœuds, ${projection.edges.length} relations`}
             data-ready={ready}
           />
           {!ready && (

@@ -7,7 +7,6 @@ import {
   LogOut,
   Disc3,
   FileMusic,
-  Layers3,
   Search,
   ShieldCheck,
 } from "lucide-react";
@@ -57,12 +56,6 @@ export function Shell({
               <Link to="/extractions">
                 <ListChecks />
                 Extractions
-              </Link>
-            </Button>
-            <Button variant="ghost" asChild className={active === "reference" ? "nav-active" : ""}>
-              <Link to="/artiste/senbei">
-                <Layers3 />
-                Référentiel
               </Link>
             </Button>
             {session ? (
@@ -200,7 +193,7 @@ export function LectureSeule({ compact = false }: { compact?: boolean }) {
     </p>
   );
 }
-export function DataNotice({ state }: { state: string }) {
+export function DataNotice({ state, artistId }: { state: string; artistId?: string }) {
   return (
     <div className="data-notice" role="status">
       <span className="status-dot" />
@@ -210,12 +203,21 @@ export function DataNotice({ state }: { state: string }) {
             ? "Le référentiel ne peut pas être lu"
             : state === "unavailable"
               ? "Le référentiel est momentanément indisponible"
-              : "Le fichier de données est en attente"}
+              : "Référentiel en cours de calcul"}
         </strong>
         <p>
-          {state === "invalid"
-            ? "Le format des données ne correspond pas au référentiel attendu."
-            : "Aucun chiffre ni aucune source ne sont présentés comme vérifiés sans les données de Senbeï."}
+          {state === "invalid" ? (
+            "Le format des données ne correspond pas au référentiel attendu."
+          ) : state === "missing" && artistId ? (
+            <>
+              Il sera disponible à la fin de la collecte.{" "}
+              <Link className="underline" to="/extractions/$artistId" params={{ artistId }}>
+                Lancer une collecte
+              </Link>
+            </>
+          ) : (
+            "Aucun chiffre ni aucune source ne sont présentés comme vérifiés sans référentiel calculé."
+          )}
         </p>
       </div>
     </div>

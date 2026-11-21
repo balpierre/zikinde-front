@@ -15,7 +15,7 @@ import {
 } from "@/lib/fiabilite";
 import { dureeCourte } from "@/lib/libelles";
 
-const fichier: unknown = JSON.parse(readFileSync("public/data/referentiel_senbei.json", "utf8"));
+const fichier: unknown = JSON.parse(readFileSync("src/test/fixtures-referentiel.json", "utf8"));
 function reference(): Referentiel {
   const result = parseReferentiel(fichier);
   if (!result.data) throw new Error(`Référentiel non chargé : ${result.state}`);
@@ -33,14 +33,14 @@ const vide = (): Referentiel => ({
 });
 
 describe("Jauges de fiabilité", () => {
-  it("calcule les trois jauges de Senbeï", () => {
+  it("calcule les trois jauges de la fixture", () => {
     const jauges = getGauges(reference());
     expect(
       jauges.map((j) => [j.id, j.numerateur, j.denominateur, pourcentageFr(j.pourcentage)]),
     ).toEqual([
       ["concordance", 6, 9, "67 %"],
-      ["isrc", 214, 243, "88 %"],
-      ["oeuvres", 3, 20, "15 %"],
+      ["isrc", 15, 15, "100 %"],
+      ["oeuvres", 5, 15, "33 %"],
     ]);
     expect(jauges.map((j) => j.niveau)).toEqual(["surveiller", "bon", "faible"]);
     expect(jauges[0]?.detail).toBe("6 champs sur 9");
@@ -70,7 +70,7 @@ describe("Jauges de fiabilité", () => {
 });
 
 describe("Cas d’ISRC en double", () => {
-  it("liste les cas de Senbeï dans l’ordre du fichier", () => {
+  it("liste les cas de la fixture dans l’ordre du fichier", () => {
     const cas = getDuplicateIsrcCases(reference());
     expect(cas).toHaveLength(5);
     expect(titresDistincts(cas)).toBe(3);
@@ -97,15 +97,15 @@ describe("Cas d’ISRC en double", () => {
 });
 
 describe("Iceberg du catalogue", () => {
-  it("compte les trois couches de Senbeï", () => {
+  it("compte les trois couches de la fixture", () => {
     const couches = getIcebergCounts(reference());
     expect(couches.map((c) => [c.type, c.nombre, c.identifiant, c.visible])).toEqual([
-      ["release", 128, "UPC", true],
-      ["recording", 243, "ISRC", false],
+      ["release", 16, "UPC", true],
+      ["recording", 15, "ISRC", false],
       ["work", 3, "ISWC", false],
     ]);
     expect(couches[2]?.avecIdentifiant).toBe(2);
-    expect(syntheseIceberg(couches)).toBe("3 œuvres documentées pour 243 enregistrements");
+    expect(syntheseIceberg(couches)).toBe("3 œuvres documentées pour 15 enregistrements");
   });
   it("suit une échelle logarithmique bornée", () => {
     expect(largeurIceberg(243, 243)).toBeCloseTo(1);

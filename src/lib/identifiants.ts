@@ -36,7 +36,12 @@ export interface CibleFiche {
   oeuvre?: string;
   entite?: string;
 }
+export interface ReferentielArtiste {
+  artistId: string;
+  data: Referentiel;
+}
 export interface ResultatIdentifiant {
+  artistId: string;
   noeud: Node;
   typeObjet: string;
   titre: string;
@@ -58,13 +63,14 @@ function cibleDe(data: Referentiel, node: Node): CibleFiche {
     return { vue: "genealogie", oeuvre: node.id };
   return { vue: "graphe", entite: node.id };
 }
+// Every loaded referential is searched; each result keeps the artist page it belongs to.
 export function findByIdentifier(
-  referentiels: Referentiel[],
+  referentiels: ReferentielArtiste[],
   identifiant: Identifiant,
 ): ResultatIdentifiant[] {
   const { type, champs } = champsParType[identifiant.type];
   const normaliser = (valeur: string) => detectIdentifier(valeur)?.valeur;
-  return referentiels.flatMap((data) =>
+  return referentiels.flatMap(({ artistId, data }) =>
     data.nodes
       .filter(
         (n) =>
@@ -72,6 +78,7 @@ export function findByIdentifier(
           valeursNoeud(n, champs).some((v) => normaliser(v) === identifiant.valeur),
       )
       .map((noeud) => ({
+        artistId,
         noeud,
         typeObjet: typesNoeuds[noeud.type] ?? "Objet",
         titre: noeud.label,
