@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { LoaderCircle } from "lucide-react";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -12,6 +13,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Concepts, Shell, metadata } from "@/components/label-pulse/shared";
 import { correspondSenbei } from "@/lib/libelles";
+import { useSession } from "@/hooks/use-session";
+import {
+  ensureOrganization,
+  requestDiscover,
+  trackArtist,
+  waitJob,
+  type Candidate,
+} from "@/lib/backend";
 
 export const Route = createFileRoute("/")({
   head: () =>
@@ -21,11 +30,51 @@ export const Route = createFileRoute("/")({
     ),
   component: Index,
 });
+type Phase = "idle" | "searching" | "candidates" | "starting" | "error";
+
 function Index() {
   const [query, setQuery] = useState("");
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { session } = useSession();
   const found = correspondSenbei(query);
   const hasQuery = query.trim().length > 0;
+
+  async function search() {
+    const name = query.trim();
+    if (!name) return;
+    if (!session) {
+      void navigate({ to: "/connexion", search: { redirect: "/" } });
+      return;
+    }
+    setPhase("searching");
+    setError(null);
+    try {
+      const org = await ensureOrganization();
+      const job = await waitJob(await requestDiscover(org.id, name));
+      if (job.status === "error") throw new Error(job.error ?? "La recherche a échoué.");
+      setCandidates(((job.result?.["candidates"] as Candidate[] | undefined) ?? []).slice(0, 8));
+      setPhase("candidates");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setPhase("error");
+    }
+  }
+
+  async function choose(candidate: Candidate) {
+    setPhase("starting");
+    try {
+      const org = await ensureOrganization();
+      const artistId = await trackArtist(org.id, candidate.name, candidate.source_id);
+      void navigate({ to: "/extractions/$artistId", params: { artistId } });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setPhase("error");
+    }
+  }
+
   return (
     <Shell>
       <main className="search-page">
@@ -45,7 +94,7 @@ function Index() {
           <form
             onSubmit={(event) => {
               event.preventDefault();
-              if (found) void navigate({ to: "/collecte/senbei" });
+              void search();
             }}
             className={`search-box ${hasQuery ? "search-box-open" : ""}`}
           >
@@ -57,7 +106,10 @@ function Index() {
                 aria-controls="artist-results"
                 placeholder="Un nom d’artiste…"
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setPhase("idle");
+                }}
                 autoComplete="off"
                 spellCheck={false}
               />
@@ -67,7 +119,10 @@ function Index() {
                   size="icon"
                   variant="ghost"
                   aria-label="Effacer la recherche"
-                  onClick={() => setQuery("")}
+                  onClick={() => {
+                    setQuery("");
+                    setPhase("idle");
+                  }}
                 >
                   <X />
                 </Button>
@@ -79,26 +134,91 @@ function Index() {
             </div>
             {hasQuery && (
               <div id="artist-results" className="search-results" aria-live="polite">
-                {found ? (
+                {phase === "idle" && (
+                  <div className="empty-result">
+                    <span>
+                      {session
+                        ? "Chercher cet artiste dans les sources"
+                        : "Connectez-vous pour lancer une extraction"}
+                    </span>
+                    <Button type="submit" size="sm">
+                      {session ? "Rechercher" : "Se connecter"} <ArrowRight />
+                    </Button>
+                  </div>
+                )}
+                {(phase === "searching" || phase === "starting") && (
+                  <div className="empty-result">
+                    <span className="flex items-center gap-2">
+                      <LoaderCircle className="animate-spin" size={16} />
+                      {phase === "searching"
+                        ? "Recherche des comptes possibles…"
+                        : "Lancement de l’extraction…"}
+                    </span>
+                  </div>
+                )}
+                {phase === "error" && (
+                  <div className="empty-result">
+                    <span className="text-destructive">{error}</span>
+                    <Button type="submit" size="sm" variant="outline">
+                      Réessayer
+                    </Button>
+                  </div>
+                )}
+                {phase === "candidates" && candidates.length === 0 && (
+                  <div className="empty-result">
+                    <span>Aucun compte trouvé pour ce nom.</span>
+                  </div>
+                )}
+                {phase === "candidates" && candidates.length > 0 && (
+                  <>
+                    <div className="px-4 pt-3 text-xs text-muted-foreground">
+                      Choisissez le bon artiste : une ressemblance de nom n’est pas une preuve.
+                    </div>
+                    {candidates.map((c) => (
+                      <Button
+                        key={c.source_id}
+                        type="button"
+                        variant="ghost"
+                        className="artist-result"
+                        onClick={() => void choose(c)}
+                      >
+                        <span className="artist-avatar">
+                          <AudioLines size={23} />
+                        </span>
+                        <span className="artist-result-name">
+                          <strong>{c.name}</strong>
+                          <span>
+                            {[
+                              c.evidence.type,
+                              c.evidence.area,
+                              c.evidence.disambiguation,
+                              c.evidence.aliases?.length
+                                ? `alias ${c.evidence.aliases.join(", ")}`
+                                : null,
+                              c.evidence.isnis?.length ? `ISNI ${c.evidence.isnis[0]}` : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ") || "Aucun indice complémentaire"}
+                          </span>
+                        </span>
+                        <ArrowRight className="result-arrow" />
+                      </Button>
+                    ))}
+                  </>
+                )}
+                {found && (
                   <Button asChild variant="ghost" className="artist-result">
                     <Link to="/collecte/senbei">
                       <span className="artist-avatar">
-                        <AudioLines size={23} />
+                        <Database size={23} />
                       </span>
                       <span className="artist-result-name">
                         <strong>Senbeï</strong>
-                        <span>Artiste · Référentiel disponible</span>
+                        <span>Référentiel de démonstration</span>
                       </span>
                       <ArrowRight className="result-arrow" />
                     </Link>
                   </Button>
-                ) : (
-                  <div className="empty-result">
-                    <span>Artiste pas encore dans le référentiel</span>
-                    <Button disabled size="sm">
-                      Lancer la collecte <ArrowRight />
-                    </Button>
-                  </div>
                 )}
               </div>
             )}
@@ -107,7 +227,7 @@ function Index() {
             <span>
               <Database size={13} /> Catalogue indépendant
             </span>
-            <span className="mono">WIKIDATA · MUSICBRAINZ · DEEZER · DISCOGS</span>
+            <span className="mono">MUSICBRAINZ · DEEZER · SPOTIFY · YOUTUBE</span>
           </div>
           <div className="featured-artist">
             <span className="featured-label">À EXPLORER</span>

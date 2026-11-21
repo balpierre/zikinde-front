@@ -2,6 +2,9 @@ import { Link } from "@tanstack/react-router";
 import {
   ArrowUpRight,
   AudioLines,
+  ListChecks,
+  LogIn,
+  LogOut,
   Disc3,
   FileMusic,
   Layers3,
@@ -12,6 +15,8 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { dateFr } from "@/lib/libelles";
 import type { Source } from "@/lib/referentiel";
+import { useSession } from "@/hooks/use-session";
+import { signOut } from "@/lib/backend";
 
 export function PulseLogo() {
   return (
@@ -29,8 +34,9 @@ export function Shell({
   active = "search",
 }: {
   children: React.ReactNode;
-  active?: "search" | "reference";
+  active?: "search" | "reference" | "extractions";
 }) {
+  const { session } = useSession();
   return (
     <TooltipProvider delayDuration={180}>
       <div className="app-shell">
@@ -43,12 +49,39 @@ export function Shell({
                 Recherche
               </Link>
             </Button>
+            <Button
+              variant="ghost"
+              asChild
+              className={active === "extractions" ? "nav-active" : ""}
+            >
+              <Link to="/extractions">
+                <ListChecks />
+                Extractions
+              </Link>
+            </Button>
             <Button variant="ghost" asChild className={active === "reference" ? "nav-active" : ""}>
               <Link to="/artiste/senbei">
                 <Layers3 />
                 Référentiel
               </Link>
             </Button>
+            {session ? (
+              <Button
+                variant="ghost"
+                title={session.user.email ?? undefined}
+                onClick={() => void signOut().then(() => window.location.assign("/"))}
+              >
+                <LogOut />
+                Déconnexion
+              </Button>
+            ) : (
+              <Button variant="ghost" asChild>
+                <Link to="/connexion" search={{ redirect: "/extractions" }}>
+                  <LogIn />
+                  Connexion
+                </Link>
+              </Button>
+            )}
           </nav>
           <span className="header-caption">LA MUSIQUE, À LA SOURCE</span>
         </header>
