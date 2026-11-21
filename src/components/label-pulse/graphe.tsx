@@ -16,11 +16,25 @@ import { SourceBadges } from "./shared";
 import {
   affirmationsGroupees,
   positionsGraphe,
+  fusionnerSansLabel,
+  relationsViaSorties,
+  SANS_LABEL,
   selectionGraphe,
   typesGraphe,
   typesParDefaut,
+  type AreteGraphe,
 } from "@/lib/graphe";
-import { bases, libelleChamp, nombre, proprieteFr, regleFr, typesNoeuds } from "@/lib/libelles";
+import {
+  bases,
+  libelleChamp,
+  libelleArtistesProches,
+  libelleRelation,
+  libelleRelationEntrante,
+  nombre,
+  proprieteFr,
+  regleFr,
+  typesNoeuds,
+} from "@/lib/libelles";
 import type { Node, Referentiel } from "@/lib/referentiel";
 
 // Canvas translates CSS theme tokens to colors supported by Cytoscape, never a second palette.
@@ -36,25 +50,52 @@ function tokenCouleur(element: HTMLElement, token: string): string {
   const pixel = context.getImageData(0, 0, 1, 1).data;
   return `rgb(${pixel[0]}, ${pixel[1]}, ${pixel[2]})`;
 }
+const RELATIONS_AFFICHEES = 5;
+// The focus artist is always shown: this filter only controls nearby artists.
+const libelleFiltre = (type: string) =>
+  type === "artist" ? libelleArtistesProches : (typesNoeuds[type] ?? type);
 function DetailNoeud({
   node,
   data,
+  noeuds,
+  aretes,
+  visibles,
   onSelect,
   onClose,
 }: {
   node: Node;
   data: Referentiel;
+  noeuds: Map<string, Node>;
+  aretes: AreteGraphe[];
+  visibles: Set<string>;
   onSelect: (id: string) => void;
   onClose: () => void;
 }) {
-  const groups = affirmationsGroupees(data, node.id);
-  const relations = data.edges.filter((e) => e.source === node.id || e.target === node.id);
+  const [ouverts, setOuverts] = useState<Set<string>>(new Set());
+  const affirmations = affirmationsGroupees(data, node.id);
+  const relations = aretes.filter((e) => e.source === node.id || e.target === node.id);
+  const groupesRelations = [
+    ...relations
+      .reduce((map, edge) => {
+        const libelle = libelleRelation(edge.type, edge.label);
+        const entrante = edge.source !== node.id;
+        const cle = `${entrante ? "in" : "out"}|${libelle}`;
+        const groupe = map.get(cle) ?? {
+          titre: entrante ? `${libelle} · ${libelleRelationEntrante}` : libelle,
+          aretes: [],
+        };
+        groupe.aretes.push(edge);
+        return map.set(cle, groupe);
+      }, new Map<string, { titre: string; aretes: AreteGraphe[] }>())
+      .entries(),
+  ];
   return (
     <aside className="graph-detail" aria-label={`Détail de ${node.label}`}>
       <div className="graph-detail-header">
         <div>
           <span className={`graph-type-mark type-${node.type}`} />
           <span>{typesNoeuds[node.type]}</span>
+          {!visibles.has(node.id) && <span className="graph-hidden">hors de la vue</span>}
         </div>
         <Button size="icon" variant="ghost" onClick={onClose} aria-label="Fermer le détail">
           <X />
@@ -87,21 +128,28 @@ function DetailNoeud({
       </section>
       <section>
         <h3>
-          Affirmations <span>{nombre(groups.length)} champs</span>
+          Affirmations <span>{nombre(affirmations.length)} champs</span>
         </h3>
-        {groups.length ? (
-          groups.map((group) => (
-            <div
-              className={`graph-claim-group ${group.divergent ? "claim-divergent" : ""}`}
-              key={group.field}
-            >
+        {affirmations.length ? (
+          affirmations.map((group) => (
+            <div className={`graph-claim-group claim-${group.etat}`} key={group.field}>
               <h4>
                 {libelleChamp(group.field)}
-                {group.divergent && (
+                {group.etat === "divergent" && (
                   <span>
                     <CircleAlert size={12} />
                     Divergent
                   </span>
+                )}
+                {group.etat === "mineur" && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span tabIndex={0}>Écart mineur</span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      Arrondi de durée ou ponctuation du titre : les sources concordent sur le fond.
+                    </TooltipContent>
+                  </Tooltip>
                 )}
               </h4>
               {group.claims.map((claim) => (
@@ -120,38 +168,40 @@ function DetailNoeud({
         <h3>
           Relations <span>{nombre(relations.length)}</span>
         </h3>
-        {relations.length ? (
-          relations.map((edge) => {
-            const targetId = edge.source === node.id ? edge.target : edge.source;
-            const target = data.nodes.find((n) => n.id === targetId);
-            return (
-              <div className="graph-relation" key={edge.id}>
-                <span>
-                  {edge.source !== node.id ? "Relation entrante · " : ""}
-                  {edge.label}
-                </span>
-                <Button variant="link" onClick={() => onSelect(targetId)}>
-                  {target?.label ?? "Objet non renseigné"}
+        {groupesRelations.length ? (
+          groupesRelations.map(([cle, { titre, aretes }]) => (
+            <div className="graph-relation-group" key={cle}>
+              <h4>
+                {titre} <span>{nombre(aretes.length)}</span>
+              </h4>
+              {(ouverts.has(cle) ? aretes : aretes.slice(0, RELATIONS_AFFICHEES)).map((edge) => (
+                <Relation
+                  key={edge.id}
+                  edge={edge}
+                  node={node}
+                  noeuds={noeuds}
+                  visibles={visibles}
+                  onSelect={onSelect}
+                />
+              ))}
+              {aretes.length > RELATIONS_AFFICHEES && (
+                <Button
+                  variant="link"
+                  className="graph-relation-more"
+                  onClick={() =>
+                    setOuverts((previous) => {
+                      const next = new Set(previous);
+                      if (next.has(cle)) next.delete(cle);
+                      else next.add(cle);
+                      return next;
+                    })
+                  }
+                >
+                  {ouverts.has(cle) ? "Réduire" : `Tout afficher (${nombre(aretes.length)})`}
                 </Button>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span
-                      className={edge.basis === "inferred" ? "graph-inferred" : "graph-declared"}
-                      tabIndex={0}
-                    >
-                      {bases[edge.basis ?? "declared"]}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {edge.basis === "inferred"
-                      ? regleFr(edge.rule ?? "Règle non renseignée")
-                      : "Relation déclarée par une source."}
-                  </TooltipContent>
-                </Tooltip>
-                <SourceBadges sources={edge.sources ?? []} />
-              </div>
-            );
-          })
+              )}
+            </div>
+          ))
         ) : (
           <p className="graph-detail-empty">Aucune relation documentée.</p>
         )}
@@ -159,7 +209,86 @@ function DetailNoeud({
     </aside>
   );
 }
-export function Graphe({ data }: { data: Referentiel }) {
+function Relation({
+  edge,
+  node,
+  noeuds,
+  visibles,
+  onSelect,
+}: {
+  edge: AreteGraphe;
+  node: Node;
+  noeuds: Map<string, Node>;
+  visibles: Set<string>;
+  onSelect: (id: string) => void;
+}) {
+  const [ouvert, setOuvert] = useState(false);
+  const targetId = edge.source === node.id ? edge.target : edge.source;
+  const target = noeuds.get(targetId);
+  const sorties = (edge.via ?? [])
+    .flatMap((id) => noeuds.get(id) ?? [])
+    .sort((a, b) => a.label.localeCompare(b.label, "fr"));
+  return (
+    <div className="graph-relation">
+      <Button variant="link" onClick={() => onSelect(targetId)}>
+        {target?.label ?? "Objet non renseigné"}
+      </Button>
+      {!visibles.has(targetId) && <span className="graph-hidden">hors de la vue</span>}
+      {edge.via ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="graph-via" tabIndex={0}>
+              {nombre(edge.via.length)} sortie{edge.via.length > 1 ? "s" : ""}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            Raccourci des relations déclarées artiste → sortie → label.
+          </TooltipContent>
+        </Tooltip>
+      ) : (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span
+              className={edge.basis === "inferred" ? "graph-inferred" : "graph-declared"}
+              tabIndex={0}
+            >
+              {bases[edge.basis ?? "declared"]}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            {edge.basis === "inferred"
+              ? regleFr(edge.rule ?? "Règle non renseignée")
+              : "Relation déclarée par une source."}
+          </TooltipContent>
+        </Tooltip>
+      )}
+      {sorties.length > 0 && (
+        <div className="graph-via-list">
+          {(ouvert ? sorties : sorties.slice(0, RELATIONS_AFFICHEES)).map((sortie) => (
+            <span key={sortie.id}>
+              <Button variant="link" onClick={() => onSelect(sortie.id)}>
+                {sortie.label}
+              </Button>
+              {!visibles.has(sortie.id) && <span className="graph-hidden"> hors de la vue</span>}
+            </span>
+          ))}
+          {sorties.length > RELATIONS_AFFICHEES && (
+            <Button
+              variant="link"
+              className="graph-relation-more"
+              onClick={() => setOuvert((previous) => !previous)}
+            >
+              {ouvert ? "Réduire" : `Tout afficher (${nombre(sorties.length)})`}
+            </Button>
+          )}
+        </div>
+      )}
+      <SourceBadges sources={edge.sources ?? []} />
+    </div>
+  );
+}
+export function Graphe({ data: referentiel }: { data: Referentiel }) {
+  const data = useMemo(() => fusionnerSansLabel(referentiel), [referentiel]);
   const [types, setTypes] = useState<string[]>(typesParDefaut);
   const [inferred, setInferred] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
@@ -168,36 +297,32 @@ export function Graphe({ data }: { data: Referentiel }) {
   const container = useRef<HTMLDivElement>(null);
   const cy = useRef<Core | null>(null);
   const projection = useMemo(() => selectionGraphe(data, types, inferred), [data, types, inferred]);
-  const node = data.nodes.find((n) => n.id === selected);
+  const noeuds = useMemo(() => new Map(data.nodes.map((n) => [n.id, n])), [data]);
+  const node = selected ? noeuds.get(selected) : undefined;
+  const visibles = useMemo(() => new Set(projection.nodes.map((n) => n.id)), [projection]);
+  // The panel lists every relation of a node, inferred ones included with their badge and rule.
+  const aretesDetail = useMemo<AreteGraphe[]>(
+    () => [...data.edges, ...relationsViaSorties(data, projection.focus)],
+    [data, projection.focus],
+  );
+  const cadre = useRef(false);
+  // One Cytoscape instance per mount: filters update its elements so zoom and pan survive.
   useEffect(() => {
     let cancelled = false;
     const element = container.current;
     if (!element) return;
-    setReady(false);
-    setFailed(false);
-    const positions = positionsGraphe(projection.nodes, projection.focus);
-    const elements: ElementDefinition[] = [
-      ...projection.nodes.map((n) => ({
-        data: { id: n.id, label: n.label, type: n.type },
-        position: positions.get(n.id) ?? { x: 0, y: 0 },
-        classes: n.id === projection.focus ? "focus-node" : "",
-      })),
-      ...projection.edges.map((e) => ({
-        data: { id: e.id, source: e.source, target: e.target, label: e.label },
-        classes: e.basis === "inferred" ? "inferred" : "",
-      })),
-    ];
     void import("cytoscape")
       .then(({ default: cytoscape }) => {
         if (cancelled) return;
         const text = tokenCouleur(element, "--foreground"),
           background = tokenCouleur(element, "--background"),
           primary = tokenCouleur(element, "--primary"),
-          line = tokenCouleur(element, "--graph-edge");
+          line = tokenCouleur(element, "--graph-edge"),
+          via = tokenCouleur(element, "--graph-label"),
+          quiet = tokenCouleur(element, "--quiet");
         const core = cytoscape({
           container: element,
-          elements,
-          layout: { name: "preset", fit: true, padding: 50 },
+          elements: [],
           minZoom: 0.12,
           maxZoom: 3,
           wheelSensitivity: 0.18,
@@ -226,6 +351,16 @@ export function Graphe({ data }: { data: Referentiel }) {
               selector: `node[type = "${type}"]`,
               style: { "background-color": tokenCouleur(element, `--graph-${type}`) },
             })),
+            {
+              selector: ".absence-node",
+              style: {
+                "background-color": background,
+                "border-width": 1.5,
+                "border-style": "dashed",
+                "border-color": quiet,
+                color: quiet,
+              },
+            },
             {
               selector: ".focus-node",
               style: {
@@ -262,6 +397,16 @@ export function Graphe({ data }: { data: Referentiel }) {
                 opacity: 0.8,
               },
             },
+            {
+              selector: "edge.via",
+              style: {
+                "line-style": "dotted",
+                "line-color": via,
+                "target-arrow-color": via,
+                width: 1.5,
+                opacity: 0.75,
+              },
+            },
             { selector: "node:selected", style: { "border-color": primary, "border-width": 4 } },
           ],
         });
@@ -272,10 +417,7 @@ export function Graphe({ data }: { data: Referentiel }) {
         core.on("tap", (event) => {
           if (event.target === core) setSelected(null);
         });
-        const observer = new ResizeObserver(() => {
-          core.resize();
-          core.fit(undefined, 50);
-        });
+        const observer = new ResizeObserver(() => core.resize());
         observer.observe(element);
         core.on("destroy", () => observer.disconnect());
         setReady(true);
@@ -287,14 +429,52 @@ export function Graphe({ data }: { data: Referentiel }) {
       cancelled = true;
       cy.current?.destroy();
       cy.current = null;
+      cadre.current = false;
+      setReady(false);
     };
-  }, [projection]);
+  }, []);
+  useEffect(() => {
+    const core = cy.current;
+    if (!core || !ready) return;
+    const positions = positionsGraphe(projection.nodes, projection.focus);
+    const elements: ElementDefinition[] = [
+      ...projection.nodes.map((n) => ({
+        group: "nodes" as const,
+        data: { id: n.id, label: n.label, type: n.type },
+        position: positions.get(n.id) ?? { x: 0, y: 0 },
+        classes:
+          n.id === projection.focus ? "focus-node" : n.id === SANS_LABEL ? "absence-node" : "",
+      })),
+      ...projection.edges.map((e) => ({
+        group: "edges" as const,
+        data: { id: e.id, source: e.source, target: e.target, label: e.label },
+        classes: e.via ? "via" : e.basis === "inferred" ? "inferred" : "",
+      })),
+    ];
+    const ids = new Set(elements.map((e) => e.data.id));
+    core.batch(() => {
+      core
+        .elements()
+        .filter((e) => !ids.has(e.id()))
+        .remove();
+      for (const element of elements) {
+        const existing = core.getElementById(element.data.id ?? "");
+        // Rings are redistributed on purpose so positions stay deterministic for a given filter set.
+        if (!existing.length) core.add(element);
+        else if (element.position) existing.position(element.position);
+      }
+    });
+    if (!cadre.current) {
+      core.fit(undefined, 50);
+      cadre.current = true;
+    }
+  }, [projection, ready]);
   useEffect(() => {
     const core = cy.current;
     if (!core) return;
     core.nodes().unselect();
     if (selected) core.getElementById(selected).select();
-  }, [selected, ready]);
+  }, [selected, ready, projection]);
   const select = (id: string) => {
     setSelected(id);
     const core = cy.current;
@@ -333,10 +513,10 @@ export function Graphe({ data }: { data: Referentiel }) {
                       checked ? [...previous, type] : previous.filter((t) => t !== type),
                     )
                   }
-                  aria-label={typesNoeuds[type]}
+                  aria-label={libelleFiltre(type)}
                 />
                 <span className={`graph-type-mark type-${type}`} />
-                {typesNoeuds[type]}
+                {libelleFiltre(type)}
               </label>
             ))}
           </div>
@@ -344,6 +524,10 @@ export function Graphe({ data }: { data: Referentiel }) {
         <div className="graph-inference-switch">
           <Switch id="graph-inference" checked={inferred} onCheckedChange={setInferred} />
           <label htmlFor="graph-inference">Afficher les relations inférées</label>
+          <span className="graph-inference-count">
+            {nombre(projection.inferees)} relation{projection.inferees > 1 ? "s" : ""} inférée
+            {projection.inferees > 1 ? "s" : ""}
+          </span>
         </div>
       </div>
       <div className={`graph-body ${node ? "with-detail" : ""}`}>
@@ -360,8 +544,8 @@ export function Graphe({ data }: { data: Referentiel }) {
               {failed ? "Le graphe n’a pas pu être chargé." : "Chargement du graphe…"}
             </div>
           )}
-          {ready && projection.nodes.length === 0 && (
-            <div className="graph-loading">Aucun nœud pour les filtres sélectionnés.</div>
+          {ready && projection.nodes.length <= 1 && (
+            <div className="graph-loading">Aucun autre nœud pour les filtres sélectionnés.</div>
           )}
           <div className="graph-tools">
             {[
@@ -407,7 +591,10 @@ export function Graphe({ data }: { data: Referentiel }) {
             ))}
           </div>
           <div className="graph-node-selector">
-            <Select value={selected ?? ""} onValueChange={select}>
+            <Select
+              value={selected && visibles.has(selected) ? selected : ""}
+              onValueChange={select}
+            >
               <SelectTrigger aria-label="Choisir un nœud">
                 <SelectValue placeholder="Nœuds du graphe" />
               </SelectTrigger>
@@ -427,8 +614,12 @@ export function Graphe({ data }: { data: Referentiel }) {
         </div>
         {node && (
           <DetailNoeud
+            key={node.id}
             node={node}
             data={data}
+            noeuds={noeuds}
+            aretes={aretesDetail}
+            visibles={visibles}
             onSelect={select}
             onClose={() => setSelected(null)}
           />
@@ -448,6 +639,10 @@ export function Graphe({ data }: { data: Referentiel }) {
         <span>
           <i className="dashed-line" />
           Relation inférée
+        </span>
+        <span>
+          <i className="dotted-line" />
+          Relation via sorties
         </span>
       </div>
     </section>

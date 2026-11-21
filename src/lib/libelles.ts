@@ -94,6 +94,28 @@ export function regleFr(rule: string): string {
     "hors mentions remix, version éditée ou concert",
   );
 }
+// Discogs credits keep their English role names in the source file.
+const rolesCredit: Record<string, string> = {
+  artwork: "illustration",
+  "artwork by": "illustration",
+  "mastered by": "mastering",
+  "mixed by": "mixage",
+  scratches: "scratch",
+};
+const relationsAgregees: Record<string, string> = {
+  via_sorties: "via sorties",
+  sans_label: "sorties sans label",
+};
+export const libelleSansLabel = "[Not on label]";
+export const libelleArtistesProches = "Artistes proches";
+export const libelleRelationEntrante = "relation entrante";
+export function libelleRelation(type: string, label: string): string {
+  if (type === "via_releases") return relationsAgregees[label] ?? "via sorties";
+  // An untranslated Discogs role keeps its source name so distinct roles stay distinct.
+  return (
+    rolesCredit[label.toLowerCase()] ?? (type === "credited_on" ? `crédité sur · ${label}` : label)
+  );
+}
 export function dateObjet(value: string | null | undefined): string {
   if (!value) return "Date non renseignée";
   if (/^\d{4}$/.test(value)) return value;

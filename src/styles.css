@@ -1602,12 +1602,16 @@ a.source-badge:hover {
   color: var(--primary);
 }
 .solid-line,
-.dashed-line {
+.dashed-line,
+.dotted-line {
   width: 22px;
   border-top: 1px solid var(--quiet);
 }
 .dashed-line {
   border-top: 1px dashed var(--primary);
+}
+.dotted-line {
+  border-top: 2px dotted var(--graph-label);
 }
 .genealogy-rights {
   border-top: 1px solid var(--border);
@@ -1988,6 +1992,13 @@ a.source-badge:hover {
   font-size: 9px;
   font-weight: 400;
 }
+.graph-claim-group.claim-mineur {
+  border-color: var(--border);
+}
+.graph-claim-group.claim-mineur h4 span {
+  color: var(--muted-foreground);
+  border-bottom: 1px dotted var(--muted-foreground);
+}
 .graph-claim {
   margin-top: 9px;
 }
@@ -2024,6 +2035,49 @@ a.source-badge:hover {
 .graph-relation .source-badges {
   flex-basis: 100%;
   margin-top: 2px;
+}
+.graph-relation-group {
+  margin-bottom: 12px;
+}
+.graph-relation-group h4 {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 500;
+}
+.graph-relation-group h4 span,
+.graph-inference-count {
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+.graph-relation-more {
+  padding: 6px 0 0;
+  height: auto;
+  font-size: 10px;
+}
+.graph-hidden {
+  color: var(--quiet);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.graph-via {
+  color: var(--graph-label);
+  border-bottom: 1px dotted var(--graph-label);
+}
+.graph-via-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  flex-basis: 100%;
+}
+.graph-via-list span {
+  font-size: 10px;
 }
 .graph-detail-empty {
   font-size: 11px;
