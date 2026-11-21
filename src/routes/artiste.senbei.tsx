@@ -21,6 +21,7 @@ import { ExportReferentiel } from "@/components/label-pulse/export-referentiel";
 import { Jauges } from "@/components/label-pulse/jauges";
 import { IsrcDouble } from "@/components/label-pulse/isrc-double";
 import { Iceberg } from "@/components/label-pulse/iceberg";
+import { ChampDivergent } from "@/components/label-pulse/champ-divergent";
 import { useDecisions } from "@/hooks/use-decisions";
 import { etatLocal } from "@/lib/anomalies";
 import { Button } from "@/components/ui/button";
@@ -44,7 +45,12 @@ import {
   type MatrixValue,
 } from "@/lib/referentiel";
 import { categories, statuts, statutsFermes, nombre, couverture } from "@/lib/libelles";
-import { getDuplicateIsrcCases, getGauges, getIcebergCounts } from "@/lib/fiabilite";
+import {
+  getDivergentFields,
+  getDuplicateIsrcCases,
+  getGauges,
+  getIcebergCounts,
+} from "@/lib/fiabilite";
 
 interface ArtistSearch {
   vue?: "genealogie" | "graphe" | "anomalies";
@@ -116,6 +122,7 @@ function Artiste() {
     data.meta.focus_artist ? node.id === data.meta.focus_artist : node.type === "artist",
   );
   const platforms = plateformes(data);
+  const divergents = new Map((data ? getDivergentFields(data) : []).map((c) => [c.field, c]));
   const groups = [...new Set(platforms.map((p) => categories[p.category] ?? "Référentiel"))];
   const sourceOpen = data?.anomalies.filter((a) => !statutsFermes.includes(a.status));
   const openAnomalies = sourceOpen?.length;
@@ -281,7 +288,18 @@ function Artiste() {
                   <tbody>
                     {data?.matrix.map((row) => (
                       <tr key={row.field}>
-                        <th scope="row">{row.label}</th>
+                        <th scope="row">
+                          {divergents.get(row.field) ? (
+                            <ChampDivergent
+                              champ={divergents.get(row.field)!}
+                              onOpenAnomaly={(id) =>
+                                void navigate({ search: { vue: "anomalies", anomalie: id } })
+                              }
+                            />
+                          ) : (
+                            row.label
+                          )}
+                        </th>
                         {SOURCES.map((name) => (
                           <td key={name}>
                             <Cell cell={row.values[name]} sourceName={name} />

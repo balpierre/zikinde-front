@@ -2966,3 +2966,98 @@ a.source-badge:hover {
     grid-column: 1 / -1;
   }
 }
+
+/* Divergent fields: amber underline and icon, comparison bubble on hover, focus or Enter. */
+.divergent-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: help;
+}
+.divergent-field > svg {
+  color: var(--warning);
+  flex-shrink: 0;
+}
+.divergent-label {
+  position: relative;
+}
+.divergent-label::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -3px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--warning);
+  animation: divergent-pulse 2.4s ease-in-out infinite;
+}
+@keyframes divergent-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+.divergent-popover {
+  width: 300px;
+  padding: 12px 14px;
+}
+.divergent-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.divergent-title svg {
+  color: var(--warning);
+}
+.divergent-values {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.divergent-values li {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+}
+.divergent-source {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+.divergent-values a {
+  color: var(--muted-foreground);
+}
+.divergent-values a:hover,
+.divergent-values a:focus-visible {
+  color: var(--primary);
+}
+.divergent-anomaly {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--primary);
+  font-size: 12px;
+  cursor: pointer;
+}

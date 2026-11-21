@@ -1,5 +1,6 @@
+import { texteObservation } from "./anomalies";
 import { nombre } from "./libelles";
-import type { Anomaly, Node, Referentiel } from "./referentiel";
+import type { Anomaly, MatrixValue, Node, Referentiel } from "./referentiel";
 
 export type NiveauJauge = "bon" | "surveiller" | "faible";
 export interface Jauge {
@@ -231,4 +232,52 @@ export function syntheseIceberg(couches: CoucheIceberg[]): string {
   const enregistrements = couches.find((c) => c.type === "recording")?.nombre ?? 0;
   if (!enregistrements && !oeuvres) return "";
   return `${nombre(oeuvres)} œuvre${oeuvres > 1 ? "s" : ""} documentée${oeuvres > 1 ? "s" : ""} pour ${pluriel(enregistrements, "enregistrement")}`;
+}
+
+export interface ValeurSource {
+  source: string;
+  valeur: string;
+  lien: string;
+}
+export interface ChampDivergent {
+  field: string;
+  libelle: string;
+  valeurs: ValeurSource[];
+  anomalie?: { id: string; label: string };
+}
+const valeurCellule = (value: MatrixValue["value"]) =>
+  value == null
+    ? ""
+    : Array.isArray(value)
+      ? value.join(", ")
+      : typeof value === "number"
+        ? nombre(value)
+        : value;
+// An anomaly on the same field carries richer observations ("Banzaï Lab (64/67 sorties)").
+export function getDivergentFields(data: Referentiel): ChampDivergent[] {
+  return data.matrix
+    .filter((row) => row.status === "divergent")
+    .map((row) => {
+      const anomalie = data.anomalies.find(
+        (a) => a.field === row.field && (a.observations?.length ?? 0) > 0,
+      );
+      const valeurs: ValeurSource[] = anomalie
+        ? (anomalie.observations ?? []).map((o) => ({
+            source: o.source.name,
+            valeur: texteObservation(o),
+            lien: o.source.source_url,
+          }))
+        : Object.entries(row.values).flatMap(([source, cell]) => {
+            const valeur = cell ? valeurCellule(cell.value) : "";
+            return valeur
+              ? [{ source, valeur, lien: cell?.sources?.[0]?.source_url ?? cell?.source_url ?? "" }]
+              : [];
+          });
+      return {
+        field: row.field,
+        libelle: row.label,
+        valeurs,
+        ...(anomalie ? { anomalie: { id: anomalie.id, label: anomalie.label } } : {}),
+      };
+    });
 }

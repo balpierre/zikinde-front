@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 import { parseReferentiel, type Referentiel } from "@/lib/referentiel";
 import {
+  getDivergentFields,
   getDuplicateIsrcCases,
   getGauges,
   getIcebergCounts,
@@ -115,5 +116,46 @@ describe("Iceberg du catalogue", () => {
   });
   it("ne produit pas de synthèse sans catalogue", () => {
     expect(syntheseIceberg(getIcebergCounts(vide()))).toBe("");
+  });
+});
+
+describe("Champs divergents", () => {
+  it("retient Label, Ville et Apple Music avec les observations des anomalies", () => {
+    const champs = getDivergentFields(reference());
+    expect(champs.map((c) => [c.field, c.anomalie?.id])).toEqual([
+      ["ville", "A03"],
+      ["label", "A01"],
+      ["id_apple-music", "A02"],
+    ]);
+    const label = champs.find((c) => c.field === "label");
+    expect(label?.valeurs.map((v) => `${v.source} : ${v.valeur}`)).toContain(
+      "Deezer : Banzaï Lab (64/67 sorties)",
+    );
+    expect(label?.valeurs.every((v) => v.lien.startsWith("https://"))).toBe(true);
+  });
+  it("compare les valeurs de la matrice sans anomalie associée", () => {
+    const data = vide();
+    data.matrix = [
+      {
+        field: "ville",
+        label: "Ville",
+        status: "divergent",
+        values: {
+          MusicBrainz: { value: "Bordeaux", source_url: "https://mb.example" },
+          Discogs: { value: "Paris" },
+          Deezer: { value: null },
+        },
+      },
+    ];
+    expect(getDivergentFields(data)).toEqual([
+      {
+        field: "ville",
+        libelle: "Ville",
+        valeurs: [
+          { source: "MusicBrainz", valeur: "Bordeaux", lien: "https://mb.example" },
+          { source: "Discogs", valeur: "Paris", lien: "" },
+        ],
+      },
+    ]);
   });
 });
