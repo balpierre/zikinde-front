@@ -58,7 +58,7 @@ export const Route = createFileRoute("/extractions/$artistId")({
   ssr: false,
   head: () => metadata("Extraction", "Progression et résultats de l’extraction d’un artiste."),
   component: () => (
-    <Shell>
+    <Shell active="extractions">
       <main className="content-page">
         <RequireAuth>
           <Extraction />
@@ -141,7 +141,7 @@ function Extraction() {
   return (
     <>
       <Button variant="link" asChild className="back-link">
-        <Link to="/extractions">
+        <Link to="/extractions" search={{ label: a.org_id }}>
           <ArrowLeft /> Extractions
         </Link>
       </Button>
