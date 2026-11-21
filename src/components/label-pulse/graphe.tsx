@@ -21,6 +21,7 @@ import {
   SANS_LABEL,
   selectionGraphe,
   typesGraphe,
+  typesFiltres,
   typesParDefaut,
   type AreteGraphe,
 } from "@/lib/graphe";
@@ -287,9 +288,15 @@ function Relation({
     </div>
   );
 }
-export function Graphe({ data: referentiel }: { data: Referentiel }) {
+export function Graphe({
+  data: referentiel,
+  type,
+}: {
+  data: Referentiel;
+  type?: string | undefined;
+}) {
   const data = useMemo(() => fusionnerSansLabel(referentiel), [referentiel]);
-  const [types, setTypes] = useState<string[]>(typesParDefaut);
+  const [types, setTypes] = useState<string[]>(() => typesFiltres(type));
   const [inferred, setInferred] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [ready, setReady] = useState(false);

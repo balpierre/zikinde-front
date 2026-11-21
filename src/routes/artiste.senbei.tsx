@@ -20,6 +20,7 @@ import { Anomalies } from "@/components/label-pulse/anomalies";
 import { ExportReferentiel } from "@/components/label-pulse/export-referentiel";
 import { Jauges } from "@/components/label-pulse/jauges";
 import { IsrcDouble } from "@/components/label-pulse/isrc-double";
+import { Iceberg } from "@/components/label-pulse/iceberg";
 import { useDecisions } from "@/hooks/use-decisions";
 import { etatLocal } from "@/lib/anomalies";
 import { Button } from "@/components/ui/button";
@@ -43,13 +44,14 @@ import {
   type MatrixValue,
 } from "@/lib/referentiel";
 import { categories, statuts, statutsFermes, nombre, couverture } from "@/lib/libelles";
-import { getDuplicateIsrcCases, getGauges } from "@/lib/fiabilite";
+import { getDuplicateIsrcCases, getGauges, getIcebergCounts } from "@/lib/fiabilite";
 
 interface ArtistSearch {
   vue?: "genealogie" | "graphe" | "anomalies";
   oeuvre?: string;
   anomalie?: string;
   correction?: boolean;
+  type?: "recording" | "release";
 }
 export const Route = createFileRoute("/artiste/senbei")({
   validateSearch: (search: Record<string, unknown>): ArtistSearch => ({
@@ -60,6 +62,9 @@ export const Route = createFileRoute("/artiste/senbei")({
       : {}),
     ...(typeof search["oeuvre"] === "string" ? { oeuvre: search["oeuvre"] } : {}),
     ...(typeof search["anomalie"] === "string" ? { anomalie: search["anomalie"] } : {}),
+    ...(search["type"] === "recording" || search["type"] === "release"
+      ? { type: search["type"] }
+      : {}),
     ...(search["correction"] === true || search["correction"] === "1" ? { correction: true } : {}),
   }),
   head: () =>
@@ -220,7 +225,7 @@ function Artiste() {
             }
           />
         ) : graphActive && data ? (
-          <Graphe data={data} />
+          <Graphe key={search.type ?? "tous"} data={data} type={search.type} />
         ) : anomaliesActive && data ? (
           <Anomalies
             data={data}
@@ -438,6 +443,25 @@ function Artiste() {
                 ))}
               </div>
             </section>
+            {data && (
+              <section className="reference-section">
+                <div className="section-heading">
+                  <div>
+                    <span className="section-index mono">04</span>
+                    <h2>L’iceberg du catalogue</h2>
+                  </div>
+                  <span className="section-detail">Œuvre, enregistrement, sortie</span>
+                </div>
+                <Iceberg
+                  couches={getIcebergCounts(data)}
+                  onOuvrir={(type) =>
+                    void navigate({
+                      search: type === "work" ? { vue: "genealogie" } : { vue: "graphe", type },
+                    })
+                  }
+                />
+              </section>
+            )}
           </>
         ) : null}
       </main>

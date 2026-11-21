@@ -4,9 +4,12 @@ import { parseReferentiel, type Referentiel } from "@/lib/referentiel";
 import {
   getDuplicateIsrcCases,
   getGauges,
+  getIcebergCounts,
+  largeurIceberg,
   niveauJauge,
   pourcentageFr,
   raccourcir,
+  syntheseIceberg,
   titresDistincts,
 } from "@/lib/fiabilite";
 import { dureeCourte } from "@/lib/libelles";
@@ -89,5 +92,28 @@ describe("Cas d’ISRC en double", () => {
   it("raccourcit la description à sa première phrase", () => {
     expect(raccourcir("Même titre, même durée. Suite longue.")).toBe("Même titre, même durée.");
     expect(raccourcir("mot ".repeat(60), 20)).toBe("mot mot mot mot mot…");
+  });
+});
+
+describe("Iceberg du catalogue", () => {
+  it("compte les trois couches de Senbeï", () => {
+    const couches = getIcebergCounts(reference());
+    expect(couches.map((c) => [c.type, c.nombre, c.identifiant, c.visible])).toEqual([
+      ["release", 128, "UPC", true],
+      ["recording", 243, "ISRC", false],
+      ["work", 3, "ISWC", false],
+    ]);
+    expect(couches[2]?.avecIdentifiant).toBe(2);
+    expect(syntheseIceberg(couches)).toBe("3 œuvres documentées pour 243 enregistrements");
+  });
+  it("suit une échelle logarithmique bornée", () => {
+    expect(largeurIceberg(243, 243)).toBeCloseTo(1);
+    expect(largeurIceberg(0, 243)).toBe(0.24);
+    const oeuvres = largeurIceberg(3, 243);
+    expect(oeuvres).toBeGreaterThan(0.24 + 0.76 * (3 / 243));
+    expect(oeuvres).toBeLessThan(largeurIceberg(128, 243));
+  });
+  it("ne produit pas de synthèse sans catalogue", () => {
+    expect(syntheseIceberg(getIcebergCounts(vide()))).toBe("");
   });
 });

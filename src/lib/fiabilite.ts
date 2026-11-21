@@ -176,3 +176,59 @@ export function raccourcir(text: string | undefined, max = 140): string {
   const coupe = phrase.slice(0, max);
   return `${coupe.slice(0, Math.max(coupe.lastIndexOf(" "), 0) || max).trimEnd()}…`;
 }
+
+export type TypeCouche = "release" | "recording" | "work";
+export interface CoucheIceberg {
+  type: TypeCouche;
+  libelle: string;
+  nombre: number;
+  identifiant: "UPC" | "ISRC" | "ISWC";
+  droits: string;
+  avecIdentifiant: number;
+  visible: boolean;
+}
+const iswc = (n: Node) => typeof n.props["iswc"] === "string" && n.props["iswc"].trim() !== "";
+// From the surface down: what the public sees, then what carries the rights.
+export function getIcebergCounts(data: Referentiel): CoucheIceberg[] {
+  const oeuvres = noeudsDeType(data, "work");
+  return [
+    {
+      type: "release" as const,
+      libelle: "Sorties",
+      nombre: noeudsDeType(data, "release").length,
+      identifiant: "UPC" as const,
+      droits: "Distribution",
+      avecIdentifiant: 0,
+      visible: true,
+    },
+    {
+      type: "recording" as const,
+      libelle: "Enregistrements",
+      nombre: noeudsDeType(data, "recording").length,
+      identifiant: "ISRC" as const,
+      droits: "Droits voisins",
+      avecIdentifiant: 0,
+      visible: false,
+    },
+    {
+      type: "work" as const,
+      libelle: "Œuvres",
+      nombre: oeuvres.length,
+      identifiant: "ISWC" as const,
+      droits: "Droits d’auteur",
+      avecIdentifiant: oeuvres.filter(iswc).length,
+      visible: false,
+    },
+  ];
+}
+// Logarithmic widths keep 3 and 243 readable on the same drawing.
+export function largeurIceberg(nombreObjets: number, maximum: number, min = 0.24, max = 1): number {
+  if (maximum <= 0 || nombreObjets <= 0) return min;
+  return min + (max - min) * (Math.log1p(nombreObjets) / Math.log1p(maximum));
+}
+export function syntheseIceberg(couches: CoucheIceberg[]): string {
+  const oeuvres = couches.find((c) => c.type === "work")?.nombre ?? 0;
+  const enregistrements = couches.find((c) => c.type === "recording")?.nombre ?? 0;
+  if (!enregistrements && !oeuvres) return "";
+  return `${nombre(oeuvres)} œuvre${oeuvres > 1 ? "s" : ""} documentée${oeuvres > 1 ? "s" : ""} pour ${pluriel(enregistrements, "enregistrement")}`;
+}

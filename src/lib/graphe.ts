@@ -19,6 +19,12 @@ export const typesParDefaut: string[] = [
   "platform",
   "recording",
 ];
+// Opening the graph on one catalogue level keeps only what anchors it (releases follow recordings).
+export function typesFiltres(type: string | undefined): string[] {
+  if (type === "recording") return ["recording"];
+  if (type === "release") return ["recording", "release"];
+  return typesParDefaut;
+}
 export function selectionGraphe(
   data: Referentiel,
   types: readonly string[] = typesParDefaut,
