@@ -1,7 +1,15 @@
 import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 import { parseReferentiel, type Referentiel } from "@/lib/referentiel";
-import { getGauges, niveauJauge, pourcentageFr } from "@/lib/fiabilite";
+import {
+  getDuplicateIsrcCases,
+  getGauges,
+  niveauJauge,
+  pourcentageFr,
+  raccourcir,
+  titresDistincts,
+} from "@/lib/fiabilite";
+import { dureeCourte } from "@/lib/libelles";
 
 const fichier: unknown = JSON.parse(readFileSync("public/data/referentiel_senbei.json", "utf8"));
 function reference(): Referentiel {
@@ -54,5 +62,32 @@ describe("Jauges de fiabilité", () => {
   });
   it("n’affiche aucune jauge sans données", () => {
     expect(getGauges(vide())).toEqual([]);
+  });
+});
+
+describe("Cas d’ISRC en double", () => {
+  it("liste les cas de Senbeï dans l’ordre du fichier", () => {
+    const cas = getDuplicateIsrcCases(reference());
+    expect(cas).toHaveLength(5);
+    expect(titresDistincts(cas)).toBe(3);
+    const [premier] = cas;
+    expect(premier?.titre).toBe("Over and Done");
+    expect(premier?.enregistrements.map((e) => [e.isrc, e.sorties])).toEqual([
+      ["FRPHC2000053", ["Over and Done (Remix)", "Play Dead", "Play Dead (XTND)"]],
+      ["FRPHC2000007", ["Reset"]],
+    ]);
+    expect(dureeCourte(premier?.dureeS)).toBe("4 min 26");
+  });
+  it("ignore un élément incomplet et l’absence d’anomalie", () => {
+    const data = vide();
+    expect(getDuplicateIsrcCases(data)).toEqual([]);
+    data.anomalies = [
+      { id: "a", label: "", status: "ouverte", type: "isrc_double", items: [{ isrc_1: "X" }] },
+    ];
+    expect(getDuplicateIsrcCases(data)).toEqual([]);
+  });
+  it("raccourcit la description à sa première phrase", () => {
+    expect(raccourcir("Même titre, même durée. Suite longue.")).toBe("Même titre, même durée.");
+    expect(raccourcir("mot ".repeat(60), 20)).toBe("mot mot mot mot mot…");
   });
 });

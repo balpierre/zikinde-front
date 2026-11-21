@@ -1,5 +1,5 @@
 import { nombre } from "./libelles";
-import type { Node, Referentiel } from "./referentiel";
+import type { Anomaly, Node, Referentiel } from "./referentiel";
 
 export type NiveauJauge = "bon" | "surveiller" | "faible";
 export interface Jauge {
@@ -104,4 +104,75 @@ export function getGauges(data: Referentiel): Jauge[] {
         : "Part des enregistrements reliés à une œuvre (composition) dans le référentiel.",
     ),
   ].filter((j) => j !== null);
+}
+
+export interface EnregistrementCas {
+  isrc: string;
+  titre: string;
+  dureeS: number | null;
+  sorties: string[];
+  noeud?: string;
+}
+export interface CasIsrcDouble {
+  anomalie: Anomaly;
+  titre: string;
+  dureeS: number | null;
+  enregistrements: [EnregistrementCas, EnregistrementCas];
+}
+const texte = (value: unknown) => (typeof value === "string" && value.trim() ? value.trim() : null);
+const listeTextes = (value: unknown) =>
+  Array.isArray(value) ? value.flatMap((v) => (texte(v) ? [texte(v) as string] : [])) : [];
+const duree = (value: unknown) =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
+
+// Each item compares two ISRC; the recording node, when known, gives the exact title and duration.
+export function getDuplicateIsrcCases(data: Referentiel): CasIsrcDouble[] {
+  const parIsrc = new Map(
+    noeudsDeType(data, "recording").flatMap((n) => {
+      const isrc = texte(n.props["isrc"]);
+      return isrc ? [[isrc.toUpperCase(), n] as const] : [];
+    }),
+  );
+  return data.anomalies
+    .filter((a) => a.type === "isrc_double")
+    .flatMap((anomalie) =>
+      (anomalie.items ?? []).flatMap((item) => {
+        const titre = texte(item["label"]);
+        const dureeS = duree(item["duree_s"]);
+        const cote = (rang: 1 | 2): EnregistrementCas | null => {
+          const isrc = texte(item[`isrc_${rang}`]);
+          if (!isrc) return null;
+          const noeud = parIsrc.get(isrc.toUpperCase());
+          return {
+            isrc,
+            titre: noeud?.label ?? titre ?? "Titre non renseigné",
+            dureeS: duree(noeud?.props["duration_s"]) ?? dureeS,
+            sorties: listeTextes(item[`sorties_${rang}`]),
+            ...(noeud ? { noeud: noeud.id } : {}),
+          };
+        };
+        const premier = cote(1);
+        const second = cote(2);
+        if (!premier || !second) return [];
+        return [
+          {
+            anomalie,
+            titre: titre ?? premier.titre,
+            dureeS,
+            enregistrements: [premier, second] as [EnregistrementCas, EnregistrementCas],
+          },
+        ];
+      }),
+    );
+}
+export function titresDistincts(cas: CasIsrcDouble[]): number {
+  return new Set(cas.map((c) => c.titre.toLocaleLowerCase("fr-FR"))).size;
+}
+// Card subtitles keep the first sentence, cut on a word boundary when still too long.
+export function raccourcir(text: string | undefined, max = 140): string {
+  if (!text) return "";
+  const phrase = text.trim().match(/^.+?[.!?](?=\s|$)/)?.[0] ?? text.trim();
+  if (phrase.length <= max) return phrase;
+  const coupe = phrase.slice(0, max);
+  return `${coupe.slice(0, Math.max(coupe.lastIndexOf(" "), 0) || max).trimEnd()}…`;
 }

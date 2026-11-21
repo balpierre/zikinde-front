@@ -2739,3 +2739,122 @@ a.source-badge:hover {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Duplicate ISRC card: two recordings side by side around a "≠". */
+.isrc-double {
+  margin: 0 0 30px;
+  padding: 20px 22px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--severity-haute);
+  border-radius: 8px;
+  background: var(--card);
+}
+.isrc-double-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+.isrc-double-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+.isrc-double h2 {
+  margin: 6px 0 6px;
+  font-size: 22px;
+}
+.isrc-double-heading p {
+  max-width: 62ch;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.isrc-double-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  font-size: 12px;
+}
+.isrc-double-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: 14px;
+}
+.isrc-recording {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+}
+.isrc-recording strong {
+  font-size: 14px;
+}
+.isrc-code {
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  color: var(--primary);
+}
+.isrc-duration,
+.isrc-releases > span,
+.isrc-releases-empty {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.isrc-releases ul {
+  margin: 4px 0 0;
+  padding-left: 16px;
+  font-size: 12px;
+}
+.isrc-double-versus {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--muted-foreground);
+  text-align: center;
+  max-width: 110px;
+}
+.isrc-not-equal {
+  font-size: 30px;
+  line-height: 1;
+  color: var(--severity-haute);
+}
+.isrc-double-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+.isrc-double-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+@media (max-width: 700px) {
+  .isrc-double-heading {
+    flex-direction: column;
+  }
+  .isrc-double-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .isrc-double-versus {
+    flex-direction: row;
+    max-width: none;
+  }
+}

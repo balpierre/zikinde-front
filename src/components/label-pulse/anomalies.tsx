@@ -425,6 +425,7 @@ function DetailAnomalie({
   artiste,
   modifier,
   masquee,
+  correction = false,
   onClose,
 }: {
   anomaly: Anomaly;
@@ -432,9 +433,12 @@ function DetailAnomalie({
   artiste: string;
   modifier: Modifier;
   masquee: boolean;
+  correction?: boolean;
   onClose: () => void;
 }) {
-  const [action, setAction] = useState<"reference" | "ignorer" | "brouillon" | null>(null);
+  const [action, setAction] = useState<"reference" | "ignorer" | "brouillon" | null>(
+    correction ? "brouillon" : null,
+  );
   const titre = useRef<HTMLHeadingElement>(null);
   // On narrow screens the list is hidden behind the detail, so focus follows the content.
   useEffect(() => {
@@ -607,10 +611,12 @@ export function Anomalies({
   decisions,
   modifier,
   persistant,
+  correction = false,
   onSelect,
 }: {
   data: Referentiel;
   selected: string | undefined;
+  correction?: boolean;
   decisions: Decisions;
   modifier: Modifier;
   persistant: boolean;
@@ -786,6 +792,7 @@ export function Anomalies({
             artiste={artiste}
             modifier={modifier}
             masquee={!liste.includes(anomaly)}
+            correction={correction}
             onClose={() => fermer(anomaly.id)}
           />
         )}
