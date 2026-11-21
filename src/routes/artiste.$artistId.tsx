@@ -20,6 +20,10 @@ import { Graphe } from "@/components/label-pulse/graphe";
 import { Genealogie } from "@/components/label-pulse/genealogie";
 import { Anomalies } from "@/components/label-pulse/anomalies";
 import { ExportReferentiel } from "@/components/label-pulse/export-referentiel";
+import { Jauges } from "@/components/label-pulse/jauges";
+import { IsrcDouble } from "@/components/label-pulse/isrc-double";
+import { Iceberg } from "@/components/label-pulse/iceberg";
+import { ChampDivergent } from "@/components/label-pulse/champ-divergent";
 import { useDecisions } from "@/hooks/use-decisions";
 import { etatLocal } from "@/lib/anomalies";
 import { Button } from "@/components/ui/button";
@@ -43,11 +47,20 @@ import {
   type MatrixValue,
 } from "@/lib/referentiel";
 import { categories, statuts, statutsFermes, nombre, couverture } from "@/lib/libelles";
+import {
+  getDivergentFields,
+  getDuplicateIsrcCases,
+  getGauges,
+  getIcebergCounts,
+} from "@/lib/fiabilite";
 
 interface ArtistSearch {
   vue?: "genealogie" | "graphe" | "anomalies";
   oeuvre?: string;
   anomalie?: string;
+  correction?: string;
+  type?: "recording" | "release";
+  entite?: string;
 }
 export const Route = createFileRoute("/artiste/$artistId")({
   ssr: false,
@@ -59,6 +72,11 @@ export const Route = createFileRoute("/artiste/$artistId")({
       : {}),
     ...(typeof search["oeuvre"] === "string" ? { oeuvre: search["oeuvre"] } : {}),
     ...(typeof search["anomalie"] === "string" ? { anomalie: search["anomalie"] } : {}),
+    ...(search["type"] === "recording" || search["type"] === "release"
+      ? { type: search["type"] }
+      : {}),
+    ...(typeof search["entite"] === "string" ? { entite: search["entite"] } : {}),
+    ...(typeof search["correction"] === "string" ? { correction: search["correction"] } : {}),
   }),
   head: () =>
     metadata(
@@ -114,6 +132,8 @@ function Artiste() {
     data.meta.focus_artist ? node.id === data.meta.focus_artist : node.type === "artist",
   );
   const platforms = plateformes(data);
+  const couches = data ? getIcebergCounts(data) : [];
+  const divergents = new Map((data ? getDivergentFields(data) : []).map((c) => [c.field, c]));
   const groups = [...new Set(platforms.map((p) => categories[p.category] ?? "Référentiel"))];
   const sourceOpen = data?.anomalies.filter((a) => !statutsFermes.includes(a.status));
   const openAnomalies = sourceOpen?.length;
@@ -162,6 +182,7 @@ function Artiste() {
           </Button>
         </div>
       </div>
+      {data && <Jauges jauges={getGauges(data)} />}
       <Concepts compact />
       <div className="artist-tabs" role="tablist" aria-label="Vues du référentiel">
         <Button
@@ -233,11 +254,17 @@ function Artiste() {
           }
         />
       ) : graphActive && data ? (
-        <Graphe data={data} />
+        <Graphe
+          key={`${search.type ?? "tous"}|${search.entite ?? ""}`}
+          data={data}
+          type={search.type}
+          entite={search.entite}
+        />
       ) : anomaliesActive && data ? (
         <Anomalies
           data={data}
           selected={search.anomalie}
+          correction={search.correction}
           decisions={decisions}
           modifier={modifier}
           persistant={persistant}
@@ -247,6 +274,14 @@ function Artiste() {
         />
       ) : overviewActive ? (
         <>
+          {data && (
+            <IsrcDouble
+              cas={getDuplicateIsrcCases(data)}
+              onCorriger={(id) =>
+                void navigate({ search: { vue: "anomalies", anomalie: id, correction: id } })
+              }
+            />
+          )}
           <section className="reference-section">
             <div className="section-heading">
               <div>
@@ -280,7 +315,18 @@ function Artiste() {
                 <tbody>
                   {data?.matrix.map((row) => (
                     <tr key={row.field}>
-                      <th scope="row">{row.label}</th>
+                      <th scope="row">
+                        {divergents.get(row.field) ? (
+                          <ChampDivergent
+                            champ={divergents.get(row.field)!}
+                            onOpenAnomaly={(id) =>
+                              void navigate({ search: { vue: "anomalies", anomalie: id } })
+                            }
+                          />
+                        ) : (
+                          row.label
+                        )}
+                      </th>
                       {sources.map((name) => (
                         <td key={name}>
                           <Cell cell={row.values[name]} sourceName={name} />
@@ -442,6 +488,25 @@ function Artiste() {
               ))}
             </div>
           </section>
+          {couches.some((c) => c.nombre > 0) && (
+            <section className="reference-section">
+              <div className="section-heading">
+                <div>
+                  <span className="section-index mono">04</span>
+                  <h2>L’iceberg du catalogue</h2>
+                </div>
+                <span className="section-detail">Œuvre, enregistrement, sortie</span>
+              </div>
+              <Iceberg
+                couches={couches}
+                onOuvrir={(type) =>
+                  void navigate({
+                    search: type === "work" ? { vue: "genealogie" } : { vue: "graphe", type },
+                  })
+                }
+              />
+            </section>
+          )}
         </>
       ) : null}
     </main>
