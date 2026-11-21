@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { LoaderCircle } from "lucide-react";
 import {
   ArrowRight,
@@ -11,10 +12,13 @@ import {
   CornerDownLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { OrganizationSelect } from "@/components/extractions/organization-select";
 import { Concepts, Shell, metadata } from "@/components/label-pulse/shared";
 import { useSession } from "@/hooks/use-session";
 import {
-  ensureOrganization,
+  organizationsQuery,
+  organizationSearch,
+  selectOrganization,
   requestDiscover,
   trackArtist,
   waitJob,
@@ -22,6 +26,7 @@ import {
 } from "@/lib/backend";
 
 export const Route = createFileRoute("/")({
+  validateSearch: organizationSearch,
   head: () =>
     metadata(
       "Recherche d’artiste",
@@ -34,24 +39,31 @@ type Phase = "idle" | "searching" | "candidates" | "starting" | "error";
 function Index() {
   const [query, setQuery] = useState("");
   const [phase, setPhase] = useState<Phase>("idle");
+  const [searchLabel, setSearchLabel] = useState<string>();
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
   const { session } = useSession();
+  const { label } = Route.useSearch();
+  const organizations = useQuery(organizationsQuery(session?.user.id));
+  const organization = selectOrganization(organizations.data, label);
+  const visiblePhase = searchLabel === organization?.id ? phase : "idle";
+  const busy = visiblePhase === "searching" || visiblePhase === "starting";
   const hasQuery = query.trim().length > 0;
 
   async function search() {
     const name = query.trim();
-    if (!name) return;
+    if (!name || busy) return;
     if (!session) {
       void navigate({ to: "/connexion", search: { redirect: "/" } });
       return;
     }
+    if (!organization) return;
+    setSearchLabel(organization.id);
     setPhase("searching");
     setError(null);
     try {
-      const org = await ensureOrganization();
-      const job = await waitJob(await requestDiscover(org.id, name));
+      const job = await waitJob(await requestDiscover(organization.id, name));
       if (job.status === "error") throw new Error(job.error ?? "La recherche a échoué.");
       setCandidates(((job.result?.["candidates"] as Candidate[] | undefined) ?? []).slice(0, 8));
       setPhase("candidates");
@@ -62,10 +74,10 @@ function Index() {
   }
 
   async function choose(candidate: Candidate) {
+    if (!organization || searchLabel !== organization.id) return;
     setPhase("starting");
     try {
-      const org = await ensureOrganization();
-      const artistId = await trackArtist(org.id, candidate.name, candidate.source_id);
+      const artistId = await trackArtist(organization.id, candidate.name, candidate.source_id);
       void navigate({ to: "/extractions/$artistId", params: { artistId } });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -89,6 +101,27 @@ function Index() {
             <span>Remonter aux sources.</span>
             <span>Retrouver les liens.</span>
           </div>
+          <OrganizationSelect
+            organizations={organizations.data}
+            selected={organization}
+            disabled={busy}
+            onSelect={(id) => {
+              setPhase("idle");
+              void navigate({ to: "/", search: { label: id } });
+            }}
+          />
+          {organizations.error && (
+            <p className="text-sm text-destructive" role="alert">
+              Impossible de charger les labels.{" "}
+              <button
+                className="underline"
+                type="button"
+                onClick={() => void organizations.refetch()}
+              >
+                Réessayer
+              </button>
+            </p>
+          )}
           <form
             onSubmit={(event) => {
               event.preventDefault();
@@ -104,6 +137,7 @@ function Index() {
                 aria-controls="artist-results"
                 placeholder="Un nom d’artiste…"
                 value={query}
+                disabled={busy}
                 onChange={(event) => {
                   setQuery(event.target.value);
                   setPhase("idle");
@@ -117,6 +151,7 @@ function Index() {
                   size="icon"
                   variant="ghost"
                   aria-label="Effacer la recherche"
+                  disabled={busy}
                   onClick={() => {
                     setQuery("");
                     setPhase("idle");
@@ -132,29 +167,29 @@ function Index() {
             </div>
             {hasQuery && (
               <div id="artist-results" className="search-results" aria-live="polite">
-                {phase === "idle" && (
+                {visiblePhase === "idle" && (
                   <div className="empty-result">
                     <span>
                       {session
                         ? "Chercher cet artiste dans les sources"
                         : "Connectez-vous pour lancer une extraction"}
                     </span>
-                    <Button type="submit" size="sm">
+                    <Button type="submit" size="sm" disabled={Boolean(session && !organization)}>
                       {session ? "Rechercher" : "Se connecter"} <ArrowRight />
                     </Button>
                   </div>
                 )}
-                {(phase === "searching" || phase === "starting") && (
+                {busy && (
                   <div className="empty-result">
                     <span className="flex items-center gap-2">
                       <LoaderCircle className="animate-spin" size={16} />
-                      {phase === "searching"
+                      {visiblePhase === "searching"
                         ? "Recherche des comptes possibles…"
                         : "Lancement de l’extraction…"}
                     </span>
                   </div>
                 )}
-                {phase === "error" && (
+                {visiblePhase === "error" && (
                   <div className="empty-result">
                     <span className="text-destructive">{error}</span>
                     <Button type="submit" size="sm" variant="outline">
@@ -162,12 +197,12 @@ function Index() {
                     </Button>
                   </div>
                 )}
-                {phase === "candidates" && candidates.length === 0 && (
+                {visiblePhase === "candidates" && candidates.length === 0 && (
                   <div className="empty-result">
                     <span>Aucun compte trouvé pour ce nom.</span>
                   </div>
                 )}
-                {phase === "candidates" && candidates.length > 0 && (
+                {visiblePhase === "candidates" && candidates.length > 0 && (
                   <>
                     <div className="px-4 pt-3 text-xs text-muted-foreground">
                       Choisissez le bon artiste : une ressemblance de nom n’est pas une preuve.

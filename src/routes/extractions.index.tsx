@@ -1,20 +1,28 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, LoaderCircle, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Shell, metadata } from "@/components/label-pulse/shared";
 import { RequireAuth } from "@/components/extractions/require-auth";
-import { ensureOrganization, listArtists } from "@/lib/backend";
+import { OrganizationSelect } from "@/components/extractions/organization-select";
+import { useSession } from "@/hooks/use-session";
+import {
+  listArtists,
+  organizationsQuery,
+  organizationSearch,
+  selectOrganization,
+} from "@/lib/backend";
 import { artistesStatuts, nomSource } from "@/lib/extraction-libelles";
 import { dateFr } from "@/lib/libelles";
 
 export const Route = createFileRoute("/extractions/")({
   ssr: false,
+  validateSearch: organizationSearch,
   head: () =>
     metadata("Extractions", "Les artistes suivis par votre label et l’état de leurs extractions."),
   component: () => (
-    <Shell>
+    <Shell active="extractions">
       <main className="content-page">
         <RequireAuth>
           <Extractions />
@@ -25,11 +33,16 @@ export const Route = createFileRoute("/extractions/")({
 });
 
 function Extractions() {
-  const org = useQuery({ queryKey: ["organisation"], queryFn: ensureOrganization });
+  const { session } = useSession();
+  const { label } = Route.useSearch();
+  const navigate = useNavigate();
+  const org = useQuery(organizationsQuery(session?.user.id));
+  const selected = selectOrganization(org.data, label);
+  const orgId = selected?.id;
   const artists = useQuery({
-    queryKey: ["artistes"],
-    queryFn: listArtists,
-    enabled: org.isSuccess,
+    queryKey: ["artistes", session?.user.id, orgId],
+    queryFn: () => (orgId ? listArtists(orgId) : []),
+    enabled: Boolean(orgId),
     refetchInterval: (query) =>
       query.state.data?.some((a) => a.status === "collecting") ? 3000 : false,
   });
@@ -38,16 +51,22 @@ function Extractions() {
     <>
       <div className="eyebrow">
         <span className="small-line" />{" "}
-        {org.data ? `LABEL · ${org.data.name.toUpperCase()}` : "LABEL"}
+        {selected ? `LABEL · ${selected.name.toUpperCase()}` : "LABEL"}
       </div>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <h1>Extractions</h1>
         <Button asChild>
-          <Link to="/">
+          <Link to="/" search={organizationSearch({ label: orgId })}>
             <Plus /> Nouvelle extraction
           </Link>
         </Button>
       </div>
+
+      <OrganizationSelect
+        organizations={org.data}
+        selected={selected}
+        onSelect={(id) => void navigate({ to: "/extractions", search: { label: id } })}
+      />
 
       {(org.isLoading || artists.isLoading) && (
         <p className="mt-6 flex items-center gap-2 text-muted-foreground">

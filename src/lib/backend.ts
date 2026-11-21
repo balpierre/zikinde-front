@@ -2,6 +2,7 @@
  * Accès au backend Music Data Hub (Supabase) — contrat : zikinde/docs/FRONTEND.md.
  * Lecture : vues v_* et tables autorisées par la RLS. Écriture : uniquement via les RPC.
  */
+import { queryOptions } from "@tanstack/react-query";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 
@@ -140,17 +141,40 @@ export async function signOut(): Promise<void> {
 
 // ------------------------------------------------------------------ label
 
-/** Label de l'utilisateur ; le crée au premier passage. */
-export async function ensureOrganization(): Promise<{ id: string; name: string }> {
-  const orgs = unwrap(
-    await supabase().from("organizations").select("id, name").order("created_at").limit(1),
-  ) as { id: string; name: string }[];
-  const existing = orgs[0];
-  if (existing) return existing;
+export interface Organization {
+  id: string;
+  name: string;
+}
+
+/** Charge les labels accessibles et crée le premier à l’arrivée d’un nouvel utilisateur. */
+async function ensureOrganizations(): Promise<Organization[]> {
+  const organizations = unwrap(
+    await supabase().from("organizations").select("id, name").order("created_at").order("id"),
+  ) as Organization[];
+  if (organizations.length) return organizations;
   const session = await getSession();
   const name = session?.user.email?.split("@")[0] ?? "Mon label";
   const id = unwrap(await supabase().rpc("create_organization", { p_name: name })) as string;
-  return { id, name };
+  return [{ id, name }];
+}
+
+export function organizationsQuery(userId: string | undefined) {
+  return queryOptions({
+    queryKey: ["organisations", userId],
+    queryFn: ensureOrganizations,
+    enabled: Boolean(userId),
+  });
+}
+
+export function selectOrganization(
+  organizations: Organization[] | undefined,
+  preferredId: string | undefined,
+): Organization | undefined {
+  return organizations?.find(({ id }) => id === preferredId) ?? organizations?.[0];
+}
+
+export function organizationSearch(search: Record<string, unknown>): { label?: string } {
+  return typeof search["label"] === "string" ? { label: search["label"] } : {};
 }
 
 // ------------------------------------------------------------------ jobs
@@ -230,9 +254,13 @@ export async function refreshArtist(artistId: string): Promise<string> {
 
 // ------------------------------------------------------------------ lecture
 
-export async function listArtists(): Promise<OrgArtist[]> {
+export async function listArtists(orgId: string): Promise<OrgArtist[]> {
   return unwrap(
-    await supabase().from("v_org_artists").select("*").order("created_at", { ascending: false }),
+    await supabase()
+      .from("v_org_artists")
+      .select("*")
+      .eq("org_id", orgId)
+      .order("created_at", { ascending: false }),
   ) as OrgArtist[];
 }
 
