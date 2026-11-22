@@ -48,6 +48,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Shell, metadata } from "@/components/label-pulse/shared";
 import { RequireAuth } from "@/components/extractions/require-auth";
 import { ComptesSources, RevueEtat } from "@/components/extractions/comptes-sources";
+import { AutresNoms } from "@/components/extractions/autres-noms";
 import { useRevue, type Revue } from "@/hooks/use-revue";
 import {
   countCatalog,
@@ -319,7 +320,12 @@ function Results({
     queryFn: () => getSourceAccounts(artistId),
   });
   const referential = useQuery(referentielQuery(artistId));
-  const setAside = referential.data?.data?.meta.set_aside ?? [];
+  const aliases = referential.data?.data?.meta.aliases ?? [];
+  // Un autre nom refusé est listé dans « Autres noms » : il ne doit pas l’être dans « Mis de côté ».
+  const aliasIds = new Set(aliases.map((a) => a.link_id));
+  const setAside = (referential.data?.data?.meta.set_aside ?? []).filter(
+    (s) => !aliasIds.has(s.link_id),
+  );
   const revue = useRevue(artistId);
   const counts = useQuery({
     queryKey: ["resultats", artistId, "compteurs"],
@@ -359,6 +365,7 @@ function Results({
         revue={revue}
         onCollecte={onCollecte}
       />
+      <AutresNoms aliases={aliases} revue={revue} onCollecte={onCollecte} />
 
       <section className="mt-10" aria-labelledby="anomalies-title">
         <h2 id="anomalies-title" className="mb-3 text-lg font-semibold">

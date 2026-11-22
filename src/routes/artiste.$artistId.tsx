@@ -40,8 +40,10 @@ import {
   plateformes,
   sourceInfo,
   sourcesCatalogue,
+  variantesDeNom,
   type MatrixValue,
 } from "@/lib/referentiel";
+import { AussiConnuSous } from "@/components/label-pulse/aussi-connu-sous";
 import { categories, statuts, statutsFermes, nombre, couverture } from "@/lib/libelles";
 
 interface ArtistSearch {
@@ -139,6 +141,7 @@ function Artiste() {
             {data?.meta.artist_name ?? artist?.label ?? suivi.data?.name ?? "Artiste"}
             <span className="heading-dot">.</span>
           </h1>
+          <AussiConnuSous noms={data ? variantesDeNom(data.meta) : []} />
           <p>{data?.meta.description ?? "Identité et catalogue en attente de vérification"}</p>
           <SourceBadges sources={artist?.sources ?? []} />
           <div className="genre-list">
