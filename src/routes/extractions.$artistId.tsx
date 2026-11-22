@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Shell, metadata } from "@/components/label-pulse/shared";
+import { AnomalyExplanationCard } from "@/components/extractions/anomaly-explanation";
 import { RequireAuth } from "@/components/extractions/require-auth";
 import { ComptesSources, RevueEtat } from "@/components/extractions/comptes-sources";
 import { BadgeAppartenance } from "@/components/extractions/appartenance";
@@ -54,6 +55,7 @@ import { AutresNoms } from "@/components/extractions/autres-noms";
 import { useRevue, type Revue } from "@/hooks/use-revue";
 import { usePerimetreLabel, type EtatLabel } from "@/hooks/use-perimetre-label";
 import {
+  anomalyExplanationsOptions,
   countCatalog,
   decideLink,
   getAnomalies,
@@ -360,6 +362,19 @@ function Results({
     queryKey: ["resultats", artistId, "anomalies"],
     queryFn: () => getAnomalies(artistId),
   });
+  const explanations = useQuery({
+    ...anomalyExplanationsOptions(artistId),
+    enabled: anomalies.data?.some(canExplain) ?? false,
+  });
+  const explanationsById = new Map(explanations.data?.map((report) => [report.anomaly_id, report]));
+  const explication = (an: Anomaly) =>
+    explanations.data && canExplain(an) ? (
+      <AnomalyExplanationCard
+        artistId={artistId}
+        anomalyId={an.id}
+        report={explanationsById.get(an.id)}
+      />
+    ) : null;
   const ids = Object.entries(knownIds).sort(([x], [y]) => x.localeCompare(y));
   const anomaliesDuPerimetre = (anomalies.data ?? []).filter((an) =>
     appartientAuPerimetre(scopeAnomalie(an.details["scope"]), label.perimetre),
@@ -420,6 +435,18 @@ function Results({
             Aucune anomalie détectée par les règles actuelles.
           </p>
         )}
+        {explanations.isError && !explanations.data && (
+          <p className="mb-3 text-sm text-muted-foreground" role="alert" lang="en">
+            Could not load explanations.{" "}
+            <Button
+              variant="link"
+              className="h-auto p-0"
+              onClick={() => void explanations.refetch()}
+            >
+              Retry
+            </Button>
+          </p>
+        )}
         {anomalies.data && (
           <>
             <h3 className="mb-1 font-medium">
@@ -430,14 +457,14 @@ function Results({
                 Anomalies sur votre catalogue. Les autres ne sont données qu’à titre d’information.
               </p>
             )}
-            <ListeAnomalies anomalies={aTraiter} />
+            <ListeAnomalies anomalies={aTraiter} explication={explication} />
             {pourInformation.length > 0 && (
               <>
                 <h3 className="mb-2 mt-6 font-medium">
                   Pour information{" "}
                   <span className="text-muted-foreground">({nombre(pourInformation.length)})</span>
                 </h3>
-                <ListeAnomalies anomalies={pourInformation} />
+                <ListeAnomalies anomalies={pourInformation} explication={explication} />
               </>
             )}
           </>
@@ -473,7 +500,13 @@ function Results({
   );
 }
 
-function ListeAnomalies({ anomalies }: { anomalies: Anomaly[] }) {
+function ListeAnomalies({
+  anomalies,
+  explication,
+}: {
+  anomalies: Anomaly[];
+  explication: (an: Anomaly) => ReactNode;
+}) {
   return (
     <ul className="grid gap-2">
       {anomalies.map((an) => (
@@ -491,6 +524,7 @@ function ListeAnomalies({ anomalies }: { anomalies: Anomaly[] }) {
               </span>
             </div>
             <AnomalyDetails details={an.details} />
+            {explication(an)}
           </div>
         </li>
       ))}
@@ -508,6 +542,23 @@ interface Observation {
   source?: string;
   value?: unknown;
   url?: string;
+}
+
+function canExplain(anomaly: Anomaly) {
+  const observations = anomaly.details["observations"];
+  return (
+    anomaly.status === "open" &&
+    ["missing_isrc", "work_without_iswc"].includes(anomaly.kind) &&
+    typeof anomaly.details["key"] === "string" &&
+    anomaly.details["key"] !== "" &&
+    Array.isArray(observations) &&
+    (observations as (Observation | null)[]).some(
+      (item) =>
+        (item?.source === "musicbrainz" || item?.source === "wikidata") &&
+        typeof item.url === "string" &&
+        typeof item.value === "string",
+    )
+  );
 }
 
 function texte(v: unknown): string {

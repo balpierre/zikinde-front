@@ -9,6 +9,7 @@ import {
   FilePen,
   ListChecks,
   RotateCcw,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -45,6 +46,7 @@ import {
   type FiltresAnomalies,
 } from "@/lib/anomalies";
 import { demandesCsv, demandesJson } from "@/lib/exports";
+import { explicationDemo } from "@/lib/explication-ia";
 import {
   dateFr,
   destinataires,
@@ -419,12 +421,56 @@ function FormulaireBrouillon({
     </form>
   );
 }
+// Demo: shows a fixed answer until the worker stores real explanations.
+function BlocExplication({ anomaly }: { anomaly: Anomaly }) {
+  const [ouverte, setOuverte] = useState(false);
+  const explication = explicationDemo(anomaly);
+  if (!explication) return null;
+  return (
+    <section className="ai-explanation">
+      <h3>Explication IA</h3>
+      <p className="ai-explanation-warning">
+        Exemple figé, sans lien avec cette anomalie : l’analyse réelle n’est pas encore branchée.
+      </p>
+      {ouverte ? (
+        <div className="decision-summary">
+          <Sparkles size={15} />
+          <div lang="en">
+            <strong>{explication.summary}</strong>
+            <p>{explication.next_action}</p>
+            <ul className="ai-evidence">
+              {explication.evidence
+                .filter((e) => explication.evidence_ids.includes(e.id))
+                .map((e) => (
+                  <li key={e.id}>
+                    <span className="mono">{e.id}</span> {e.source} · {e.value}{" "}
+                    <a href={e.url} target="_blank" rel="noreferrer">
+                      Ouvrir <ArrowUpRight size={11} />
+                    </a>
+                  </li>
+                ))}
+            </ul>
+            <span lang="fr">
+              {explication.synthetic ? "Exemple synthétique · " : ""}
+              Modèle prévu : {explication.model}
+            </span>
+          </div>
+        </div>
+      ) : (
+        <Button variant="outline" onClick={() => setOuverte(true)}>
+          <Sparkles /> Voir un exemple
+        </Button>
+      )}
+    </section>
+  );
+}
 function DetailAnomalie({
   anomaly,
   decision,
   artiste,
   modifier,
   masquee,
+  correction = false,
   onClose,
 }: {
   anomaly: Anomaly;
@@ -432,9 +478,12 @@ function DetailAnomalie({
   artiste: string;
   modifier: Modifier;
   masquee: boolean;
+  correction?: boolean;
   onClose: () => void;
 }) {
-  const [action, setAction] = useState<"reference" | "ignorer" | "brouillon" | null>(null);
+  const [action, setAction] = useState<"reference" | "ignorer" | "brouillon" | null>(
+    correction ? "brouillon" : null,
+  );
   const titre = useRef<HTMLHeadingElement>(null);
   // On narrow screens the list is hidden behind the detail, so focus follows the content.
   useEffect(() => {
@@ -497,6 +546,7 @@ function DetailAnomalie({
           </p>
         )}
       </section>
+      <BlocExplication anomaly={anomaly} />
       {items.length > 0 && (
         <section>
           <h3>
@@ -607,10 +657,12 @@ export function Anomalies({
   decisions,
   modifier,
   persistant,
+  correction,
   onSelect,
 }: {
   data: Referentiel;
   selected: string | undefined;
+  correction?: string | undefined;
   decisions: Decisions;
   modifier: Modifier;
   persistant: boolean;
@@ -786,6 +838,7 @@ export function Anomalies({
             artiste={artiste}
             modifier={modifier}
             masquee={!liste.includes(anomaly)}
+            correction={correction === anomaly.id}
             onClose={() => fermer(anomaly.id)}
           />
         )}

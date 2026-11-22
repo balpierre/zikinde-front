@@ -1,6 +1,6 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { LoaderCircle } from "lucide-react";
 import {
   ArrowRight,
@@ -10,12 +10,16 @@ import {
   X,
   Database,
   CornerDownLeft,
+  Fingerprint,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { OrganizationSelect } from "@/components/extractions/organization-select";
 import { Concepts, Shell, metadata } from "@/components/label-pulse/shared";
+import { referentielQuery } from "@/lib/referentiel";
+import { detectIdentifier, findByIdentifier, messageIntrouvable } from "@/lib/identifiants";
 import { useSession } from "@/hooks/use-session";
 import {
+  listArtists,
   organizationsQuery,
   organizationSearch,
   selectOrganization,
@@ -53,8 +57,40 @@ function Index() {
   // Plusieurs candidats au même nom : l’utilisateur doit comparer pays et dates avant de choisir.
   const nomsEnDouble =
     new Set(candidates.map((c) => c.name.trim().toLowerCase())).size < candidates.length;
+  const identifiant = detectIdentifier(query);
+  // Identifiers are looked up in the referentials of every artist the selected label follows.
+  const orgId = identifiant && session ? organization?.id : undefined;
+  const artistes = useQuery({
+    queryKey: ["artistes", session?.user.id, orgId],
+    queryFn: () => (orgId ? listArtists(orgId) : []),
+    enabled: Boolean(orgId),
+  });
+  const referentiels = useQueries({
+    queries: (orgId ? (artistes.data ?? []) : []).map((a) => referentielQuery(a.id)),
+  });
+  const chargement =
+    Boolean(orgId) && (artistes.isPending || referentiels.some((r) => r.isPending));
+  const disponibles = (artistes.data ?? []).flatMap((a, i) => {
+    const data = referentiels[i]?.data?.data;
+    return data ? [{ artistId: a.id, data }] : [];
+  });
+  const resultats = identifiant ? findByIdentifier(disponibles, identifiant) : [];
+
+  function ouvrir(index: number) {
+    const resultat = resultats[index];
+    if (!resultat) return;
+    void navigate({
+      to: "/artiste/$artistId",
+      params: { artistId: resultat.artistId },
+      search: resultat.cible,
+    });
+  }
 
   async function search() {
+    if (identifiant) {
+      ouvrir(0);
+      return;
+    }
     const name = query.trim();
     if (!name || busy) return;
     if (!session) {
@@ -135,10 +171,11 @@ function Index() {
             <div className="search-input-row">
               <Search size={23} aria-hidden="true" />
               <input
-                aria-label="Rechercher un artiste"
+                aria-label="Rechercher un artiste ou un identifiant"
                 aria-autocomplete="list"
                 aria-controls="artist-results"
-                placeholder="Un nom d’artiste…"
+                aria-describedby="search-hint"
+                placeholder="Un nom d’artiste, un ISRC, un ISWC ou un UPC…"
                 value={query}
                 disabled={busy}
                 onChange={(event) => {
@@ -170,7 +207,67 @@ function Index() {
             </div>
             {hasQuery && (
               <div id="artist-results" className="search-results" aria-live="polite">
-                {visiblePhase === "idle" && (
+                {identifiant && (
+                  <>
+                    {!session && (
+                      <div className="empty-result">
+                        <span>
+                          Connectez-vous pour chercher un {identifiant.code} dans vos référentiels
+                        </span>
+                        <Button type="button" size="sm" asChild>
+                          <Link to="/connexion" search={{ redirect: "/" }}>
+                            Se connecter <ArrowRight />
+                          </Link>
+                        </Button>
+                      </div>
+                    )}
+                    {chargement && (
+                      <div className="empty-result">
+                        <span className="flex items-center gap-2">
+                          <LoaderCircle className="animate-spin" size={16} />
+                          Recherche de l’{identifiant.code} dans les référentiels…
+                        </span>
+                      </div>
+                    )}
+                    {orgId && !chargement && artistes.isError && (
+                      <div className="empty-result">
+                        <span>Les référentiels sont indisponibles pour le moment.</span>
+                      </div>
+                    )}
+                    {orgId && !chargement && !artistes.isError && resultats.length === 0 && (
+                      <div className="empty-result" role="status">
+                        <span>{messageIntrouvable(identifiant)}</span>
+                      </div>
+                    )}
+                    {resultats.map((r) => (
+                      <Button
+                        key={`${r.artistId}|${r.noeud.id}`}
+                        asChild
+                        variant="ghost"
+                        className="artist-result"
+                      >
+                        <Link
+                          to="/artiste/$artistId"
+                          params={{ artistId: r.artistId }}
+                          search={r.cible}
+                        >
+                          <span className="artist-avatar">
+                            <Fingerprint size={23} />
+                          </span>
+                          <span className="artist-result-name">
+                            <strong>{r.titre}</strong>
+                            <span>
+                              <span className="identifier-type">{r.typeObjet}</span> · {r.artiste} ·{" "}
+                              <span className="mono">{identifiant.code}</span>
+                            </span>
+                          </span>
+                          <ArrowRight className="result-arrow" />
+                        </Link>
+                      </Button>
+                    ))}
+                  </>
+                )}
+                {!identifiant && visiblePhase === "idle" && (
                   <div className="empty-result">
                     <span>
                       {session
@@ -256,6 +353,9 @@ function Index() {
               </div>
             )}
           </form>
+          <p id="search-hint" className="search-hint">
+            Nom d’artiste, ISRC, ISWC ou UPC
+          </p>
           <div className="search-under">
             <span>
               <Database size={13} /> Catalogue indépendant

@@ -40,6 +40,13 @@ export function nombre(value: number | null | undefined): string {
     ? "—"
     : new Intl.NumberFormat("fr-FR").format(value).replace(/[\u202f\u00a0]/g, " ");
 }
+// Short duration for compact cards: "4 min 26", "42 s".
+export function dureeCourte(seconds: number | null | undefined): string {
+  if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return "Durée non renseignée";
+  const total = Math.round(seconds);
+  if (total < 60) return `${total} s`;
+  return `${nombre(Math.floor(total / 60))} min ${String(total % 60).padStart(2, "0")}`;
+}
 export function dateFr(value: string | null | undefined): string {
   if (!value) return "Date de collecte non renseignée";
   const date = new Date(value);

@@ -90,6 +90,10 @@
   --severity-moyenne: oklch(0.8 0.11 85);
   --severity-faible: var(--muted-foreground);
   --severity-info: var(--quiet);
+  --warning: var(--severity-moyenne);
+  --level-bon: var(--primary);
+  --level-surveiller: var(--warning);
+  --level-faible: var(--destructive);
 }
 @layer base {
   * {
@@ -2521,6 +2525,23 @@ a.source-badge:hover {
   font-size: 10px;
   color: var(--quiet);
 }
+.ai-explanation-warning {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--warning, var(--primary));
+}
+.ai-evidence {
+  margin: 6px 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+.ai-evidence .mono {
+  font-size: 11px;
+  color: inherit;
+}
 .decision-actions,
 .draft-actions {
   display: flex;
@@ -2640,4 +2661,430 @@ a.source-badge:hover {
   .identity-aside {
     margin-top: 0;
   }
+}
+
+/* Reliability gauges: the level is always written next to its color. */
+.gauges {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 4px 0 22px;
+}
+.gauge {
+  --gauge-color: var(--level-bon);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+}
+.gauge-surveiller {
+  --gauge-color: var(--level-surveiller);
+}
+.gauge-faible {
+  --gauge-color: var(--level-faible);
+}
+.gauge-ring {
+  width: 76px;
+  height: 76px;
+  flex-shrink: 0;
+  transform: rotate(-90deg);
+}
+.gauge-track,
+.gauge-value {
+  fill: none;
+  stroke-width: 7;
+}
+.gauge-track {
+  stroke: var(--secondary);
+}
+.gauge-value {
+  stroke: var(--gauge-color);
+  stroke-linecap: round;
+  animation: gauge-fill 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes gauge-fill {
+  from {
+    stroke-dashoffset: var(--gauge-full);
+  }
+  to {
+    stroke-dashoffset: var(--gauge-offset);
+  }
+}
+.gauge-percent {
+  transform: rotate(90deg);
+  transform-origin: 42px 42px;
+  fill: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 600;
+}
+.gauge-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.gauge-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.gauge-label svg {
+  color: var(--muted-foreground);
+}
+.gauge-detail {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.gauge-level {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--gauge-color);
+}
+.gauge-tooltip {
+  max-width: 280px;
+}
+@media (max-width: 900px) {
+  .gauges {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Duplicate ISRC card: two recordings side by side around a "≠". */
+.isrc-double {
+  margin: 0 0 30px;
+  padding: 20px 22px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--severity-haute);
+  border-radius: 8px;
+  background: var(--card);
+}
+.isrc-double-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+.isrc-double-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+.isrc-double h2 {
+  margin: 6px 0 6px;
+  font-size: 22px;
+}
+.isrc-double-heading p {
+  max-width: 62ch;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.isrc-double-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  font-size: 12px;
+}
+.isrc-double-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: 14px;
+}
+.isrc-recording {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+}
+.isrc-recording strong {
+  font-size: 14px;
+}
+.isrc-code {
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  color: var(--primary);
+}
+.isrc-duration,
+.isrc-releases > span,
+.isrc-releases-empty {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.isrc-releases ul {
+  margin: 4px 0 0;
+  padding-left: 16px;
+  font-size: 12px;
+}
+.isrc-double-versus {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--muted-foreground);
+  text-align: center;
+  max-width: 110px;
+}
+.isrc-not-equal {
+  font-size: 30px;
+  line-height: 1;
+  color: var(--severity-haute);
+}
+.isrc-double-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+.isrc-double-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+@media (max-width: 700px) {
+  .isrc-double-heading {
+    flex-direction: column;
+  }
+  .isrc-double-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .isrc-double-versus {
+    flex-direction: row;
+    max-width: none;
+  }
+}
+
+/* Catalogue iceberg: logarithmic layer widths, waterline between releases and rights. */
+.iceberg {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--card);
+}
+.iceberg-surface,
+.iceberg-depth {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 18px;
+}
+.iceberg-depth {
+  background: color-mix(in oklch, var(--graph-platform) 10%, var(--card));
+}
+.iceberg-waterline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 18px;
+  border-top: 1px dashed var(--muted-foreground);
+  font-size: 10px;
+  color: var(--muted-foreground);
+  background: color-mix(in oklch, var(--graph-platform) 10%, var(--card));
+}
+.iceberg-layer {
+  --layer-color: var(--release);
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--foreground);
+  text-align: left;
+  cursor: pointer;
+}
+.iceberg-layer.recording {
+  --layer-color: var(--recording);
+}
+.iceberg-layer.work {
+  --layer-color: var(--work);
+}
+.iceberg-layer:hover,
+.iceberg-layer:focus-visible {
+  border-color: var(--border);
+  background: var(--accent);
+}
+.iceberg-shape {
+  width: 100%;
+  height: 46px;
+}
+.iceberg-shape polygon {
+  fill: color-mix(in oklch, var(--layer-color) 22%, transparent);
+  stroke: var(--layer-color);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.iceberg-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.iceberg-meta strong {
+  font-family: var(--font-mono);
+  font-size: 20px;
+}
+.iceberg-meta strong span {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+}
+.iceberg-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+.iceberg-tags .mono {
+  color: var(--layer-color);
+}
+.iceberg-sub {
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+.iceberg-arrow {
+  color: var(--muted-foreground);
+}
+.iceberg-summary {
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+}
+@media (max-width: 700px) {
+  .iceberg-layer {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .iceberg-shape {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Divergent fields: amber underline and icon, comparison bubble on hover, focus or Enter. */
+.divergent-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: help;
+}
+.divergent-field > svg {
+  color: var(--warning);
+  flex-shrink: 0;
+}
+.divergent-label {
+  position: relative;
+}
+.divergent-label::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -3px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--warning);
+  animation: divergent-pulse 2.4s ease-in-out infinite;
+}
+@keyframes divergent-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+.divergent-popover {
+  width: 300px;
+  padding: 12px 14px;
+}
+.divergent-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.divergent-title svg {
+  color: var(--warning);
+}
+.divergent-values {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.divergent-values li {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+}
+.divergent-source {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+.divergent-values a {
+  color: var(--muted-foreground);
+}
+.divergent-values a:hover,
+.divergent-values a:focus-visible {
+  color: var(--primary);
+}
+.divergent-anomaly {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* Identifier search: discreet format hint and object type in suggestions. */
+.search-hint {
+  margin: 8px 1px 0;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.identifier-type {
+  color: var(--primary);
 }
