@@ -7,12 +7,20 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 
 export type StepStatus =
-  "running" | "done" | "error" | "not_configured" | "rate_limited" | "no_connector";
+  | "running"
+  | "done"
+  | "error"
+  | "not_configured"
+  | "rate_limited"
+  | "no_connector"
+  | "skipped"
+  | "unknown_source";
 
 export interface StepInfo {
   status: StepStatus;
   source_id?: string | string[];
-  stats?: Record<string, number>;
+  /** Compteurs de la source ; `reused` : fiche relue en base lors d'une relance ciblée. */
+  stats?: Record<string, number | boolean>;
   stored?: boolean;
   error?: string;
   retry_after_s?: number;
@@ -322,6 +330,14 @@ export async function trackArtist(orgId: string, name: string, mbid: string): Pr
 
 export async function refreshArtist(artistId: string): Promise<string> {
   return unwrap(await supabase().rpc("refresh_artist", { p_artist: artistId })) as string;
+}
+
+/** Relance ciblée : recollecte seulement ces sources ; les autres sont relues en base, puis liens,
+ * réconciliation et référentiel sont recalculés. */
+export async function refreshSources(artistId: string, sources: string[]): Promise<string> {
+  return unwrap(
+    await supabase().rpc("refresh_sources", { p_artist: artistId, p_sources: sources }),
+  ) as string;
 }
 
 // ------------------------------------------------------------------ lecture

@@ -12,7 +12,9 @@ import {
   KeyRound,
   Layers3,
   LoaderCircle,
+  Play,
   RefreshCw,
+  RotateCw,
   Upload,
   X,
 } from "lucide-react";
@@ -39,6 +41,7 @@ import {
   getCatalog,
   getSourceAccounts,
   refreshArtist,
+  refreshSources,
   watchJob,
   type Anomaly,
   type CatalogItem,
@@ -50,6 +53,7 @@ import {
 import {
   anomaliesTypes,
   artistesStatuts,
+  connecteurs,
   dureeFr,
   etapesStatuts,
   methodeLien,
@@ -80,6 +84,8 @@ const stepIcons: Record<StepStatus, typeof Check> = {
   not_configured: KeyRound,
   rate_limited: Clock,
   no_connector: CircleSlash,
+  skipped: CircleDashed,
+  unknown_source: CircleSlash,
 };
 
 function Extraction() {
@@ -109,12 +115,18 @@ function Extraction() {
     return stop;
   }, [jobId, artistId, queryClient]);
 
-  async function relaunch() {
+  const [relaunchError, setRelaunchError] = useState<string | null>(null);
+
+  async function relaunch(sources?: string[]) {
     setRelaunching(true);
+    setRelaunchError(null);
     try {
-      await refreshArtist(artistId);
+      if (sources?.length) await refreshSources(artistId, sources);
+      else await refreshArtist(artistId);
       setJob(null);
       await queryClient.invalidateQueries({ queryKey: ["artiste", artistId] });
+    } catch (e) {
+      setRelaunchError(e instanceof Error ? e.message : "Relance impossible.");
     } finally {
       setRelaunching(false);
     }
@@ -185,7 +197,7 @@ function Extraction() {
               <Upload /> Sources & imports
             </Link>
           </Button>
-          <Button onClick={relaunch} disabled={active || relaunching} variant="outline">
+          <Button onClick={() => relaunch()} disabled={active || relaunching} variant="outline">
             <RefreshCw className={active || relaunching ? "animate-spin" : ""} /> Relancer
             l’extraction
           </Button>
@@ -202,7 +214,18 @@ function Extraction() {
         {job?.status === "queued" && (
           <p className="mb-3 text-sm text-muted-foreground">En attente du moteur de collecte…</p>
         )}
-        <Steps progress={progress} />
+        <Steps
+          progress={progress}
+          onRelaunch={
+            a.status === "collecting" || !a.mbid ? undefined : (source) => relaunch([source])
+          }
+          disabled={active || relaunching}
+        />
+        {relaunchError && (
+          <p className="mt-3 text-sm text-destructive" role="alert">
+            {relaunchError}
+          </p>
+        )}
         {jobError && (
           <p className="mt-3 text-sm text-destructive" role="alert">
             {jobError.split("\n")[0]}
@@ -215,10 +238,20 @@ function Extraction() {
   );
 }
 
-function Steps({ progress }: { progress: Record<string, StepInfo> }) {
+function Steps({
+  progress,
+  onRelaunch,
+  disabled,
+}: {
+  progress: Record<string, StepInfo>;
+  onRelaunch?: ((source: string) => void) | undefined;
+  disabled?: boolean;
+}) {
   const keys = Object.keys(progress).sort(
     (x, y) => ((ordreSources.indexOf(x) + 99) % 99) - ((ordreSources.indexOf(y) + 99) % 99),
   );
+  // Connecteurs absents de la dernière collecte (ajoutés depuis) : on peut les lancer seuls
+  const missing = connecteurs.filter((c) => !(c in progress));
   if (!keys.length) {
     return (
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -243,30 +276,71 @@ function Steps({ progress }: { progress: Record<string, StepInfo> }) {
                     : "text-muted-foreground"
               }`}
             />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <strong>{nomSource(key)}</strong>{" "}
               <span className="text-sm text-muted-foreground">
                 {etapesStatuts[step.status] ?? step.status}
               </span>
               <div className="text-xs text-muted-foreground">{stepDetail(step)}</div>
             </div>
+            {onRelaunch && connecteurs.includes(key) && step.status !== "running" && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="shrink-0"
+                disabled={disabled}
+                onClick={() => onRelaunch(key)}
+                title={`Recollecter ${nomSource(key)} seulement`}
+                aria-label={`Relancer ${nomSource(key)}`}
+              >
+                <RotateCw /> Relancer
+              </Button>
+            )}
           </li>
         );
       })}
+      {onRelaunch &&
+        missing.map((key) => (
+          <li key={key} className="flex items-start gap-3 rounded-lg border border-dashed p-3">
+            <CircleDashed size={18} className="mt-0.5 shrink-0 text-muted-foreground" />
+            <div className="min-w-0 flex-1">
+              <strong>{nomSource(key)}</strong>{" "}
+              <span className="text-sm text-muted-foreground">Pas encore lancé</span>
+              <div className="text-xs text-muted-foreground">
+                Nouvelle source, absente de la dernière collecte.
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="shrink-0"
+              disabled={disabled}
+              onClick={() => onRelaunch(key)}
+              aria-label={`Lancer ${nomSource(key)}`}
+            >
+              <Play /> Lancer
+            </Button>
+          </li>
+        ))}
     </ul>
   );
 }
 
 function stepDetail(step: StepInfo): string {
   if (step.status === "done") {
-    if (step.stored === false)
-      return `${nombre(step.stats?.["records"] ?? 0)} éléments consultés (non stockés)`;
     const s = step.stats ?? {};
+    if (s["reused"] === true) return "Repris de la collecte précédente (non relancé).";
+    if (step.stored === false)
+      return `${nombre(Number(s["records"] ?? 0))} éléments consultés (non stockés)`;
+    if (typeof s["asked"] === "number")
+      return `${nombre(Number(s["found"] ?? 0))} retrouvés sur ${nombre(s["asked"])} identifiants demandés`;
     const total = Object.entries(s)
       .filter(([k]) => k.startsWith("entity:"))
-      .reduce((n, [, v]) => n + v, 0);
+      .reduce((n, [, v]) => n + Number(v), 0);
     return total ? `${nombre(total)} éléments normalisés` : "";
   }
+  if (step.status === "skipped") return "Pas demandé dans cette relance, rien à reprendre.";
+  if (step.status === "unknown_source") return "Le moteur ne connaît pas cette source.";
   if (step.status === "rate_limited" && step.retry_after_s) {
     return `Quota de la source atteint, réessayer dans ${Math.ceil(step.retry_after_s / 3600)} h environ.`;
   }

@@ -9,6 +9,13 @@ export const sourcesNoms: Record<string, string> = {
   wikidata: "Wikidata",
   apple_music: "Apple Music",
   lastfm: "Last.fm",
+  listenbrainz: "ListenBrainz",
+  tidal: "Tidal",
+  genius: "Genius",
+  setlistfm: "setlist.fm",
+  alias: "Autres noms",
+  reconcile: "Réconciliation",
+  referential: "Référentiel",
   isni: "ISNI",
   ipi: "IPI",
 };
@@ -22,6 +29,27 @@ export const ordreSources = [
   "discogs",
   "wikidata",
   "apple_music",
+  "tidal",
+  "lastfm",
+  "listenbrainz",
+  "genius",
+  "setlistfm",
+];
+
+/** Connecteurs du moteur qu'on peut lancer ou relancer seuls (RPC refresh_sources). */
+export const connecteurs = [
+  "musicbrainz",
+  "wikidata",
+  "deezer",
+  "discogs",
+  "spotify",
+  "youtube",
+  "apple_music",
+  "tidal",
+  "lastfm",
+  "listenbrainz",
+  "genius",
+  "setlistfm",
 ];
 
 export function nomSource(id: string): string {
@@ -35,6 +63,8 @@ export const etapesStatuts: Record<StepStatus, string> = {
   not_configured: "Non configuré",
   rate_limited: "Quota atteint",
   no_connector: "Repéré, pas encore collecté",
+  skipped: "Non relancé",
+  unknown_source: "Source inconnue",
 };
 
 export const jobsStatuts: Record<JobStatus, string> = {
