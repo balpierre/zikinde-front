@@ -164,8 +164,12 @@ export interface Organization {
   name: string;
 }
 
-/** Charge les labels accessibles et crée le premier à l’arrivée d’un nouvel utilisateur. */
+/**
+ * Charge les labels accessibles et crée le premier à l’arrivée d’un nouvel utilisateur.
+ * Les invitations sont acceptées d’abord : un invité rejoint le label qui l’a invité au lieu d’en créer un vide.
+ */
 async function ensureOrganizations(): Promise<Organization[]> {
+  check((await supabase().rpc("accept_invitations")).error);
   const organizations = unwrap(
     await supabase().from("organizations").select("id, name").order("created_at").order("id"),
   ) as Organization[];
@@ -193,6 +197,56 @@ export function selectOrganization(
 
 export function organizationSearch(search: Record<string, unknown>): { label?: string } {
   return typeof search["label"] === "string" ? { label: search["label"] } : {};
+}
+
+// ------------------------------------------------------------------ membres du label
+
+export type MemberRole = "owner" | "member";
+
+export interface Member {
+  user_id: string;
+  email: string | null;
+  role: MemberRole;
+  joined_at: string;
+}
+
+export interface Invitation {
+  id: string;
+  email: string;
+  created_at: string;
+}
+
+export function isOwner(members: Member[] | undefined, userId: string | undefined): boolean {
+  return Boolean(userId && members?.some((m) => m.user_id === userId && m.role === "owner"));
+}
+
+export async function listMembers(orgId: string): Promise<Member[]> {
+  return unwrap(await supabase().rpc("list_org_members", { p_org: orgId })) as Member[];
+}
+
+export async function listInvitations(orgId: string): Promise<Invitation[]> {
+  return unwrap(
+    await supabase()
+      .from("invitations")
+      .select("id, email, created_at")
+      .eq("org_id", orgId)
+      .order("created_at"),
+  ) as Invitation[];
+}
+
+/** Invite une adresse (réservé à l’owner) ; le compte qui la porte rejoint le label à sa connexion. */
+export async function inviteMember(orgId: string, email: string): Promise<string> {
+  return unwrap(
+    await supabase().rpc("invite_member", { p_org: orgId, p_email: email.trim() }),
+  ) as string;
+}
+
+export async function revokeInvitation(invitationId: string): Promise<void> {
+  check((await supabase().rpc("revoke_invitation", { p_invitation: invitationId })).error);
+}
+
+export async function removeMember(orgId: string, userId: string): Promise<void> {
+  check((await supabase().rpc("remove_member", { p_org: orgId, p_user: userId })).error);
 }
 
 // ------------------------------------------------------------------ jobs

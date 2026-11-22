@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ConnexionRouteImport } from './routes/connexion'
+import { Route as MembresRouteImport } from './routes/membres'
 import { Route as ArtisteArtistIdRouteImport } from './routes/artiste.$artistId'
 import { Route as CollecteArtistIdRouteImport } from './routes/collecte.$artistId'
 import { Route as ExtractionsIndexRouteImport } from './routes/extractions.index'
@@ -24,6 +25,11 @@ const IndexRoute = IndexRouteImport.update({
 const ConnexionRoute = ConnexionRouteImport.update({
   id: '/connexion',
   path: '/connexion',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MembresRoute = MembresRouteImport.update({
+  id: '/membres',
+  path: '/membres',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ArtisteArtistIdRoute = ArtisteArtistIdRouteImport.update({
@@ -50,6 +56,7 @@ const ExtractionsArtistIdRoute = ExtractionsArtistIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/connexion': typeof ConnexionRoute
+  '/membres': typeof MembresRoute
   '/artiste/$artistId': typeof ArtisteArtistIdRoute
   '/collecte/$artistId': typeof CollecteArtistIdRoute
   '/extractions/$artistId': typeof ExtractionsArtistIdRoute
@@ -58,6 +65,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/connexion': typeof ConnexionRoute
+  '/membres': typeof MembresRoute
   '/artiste/$artistId': typeof ArtisteArtistIdRoute
   '/collecte/$artistId': typeof CollecteArtistIdRoute
   '/extractions/$artistId': typeof ExtractionsArtistIdRoute
@@ -67,6 +75,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/connexion': typeof ConnexionRoute
+  '/membres': typeof MembresRoute
   '/artiste/$artistId': typeof ArtisteArtistIdRoute
   '/collecte/$artistId': typeof CollecteArtistIdRoute
   '/extractions/$artistId': typeof ExtractionsArtistIdRoute
@@ -77,6 +86,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/connexion'
+    | '/membres'
     | '/artiste/$artistId'
     | '/collecte/$artistId'
     | '/extractions/$artistId'
@@ -85,6 +95,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/connexion'
+    | '/membres'
     | '/artiste/$artistId'
     | '/collecte/$artistId'
     | '/extractions/$artistId'
@@ -93,6 +104,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/connexion'
+    | '/membres'
     | '/artiste/$artistId'
     | '/collecte/$artistId'
     | '/extractions/$artistId'
@@ -102,6 +114,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ConnexionRoute: typeof ConnexionRoute
+  MembresRoute: typeof MembresRoute
   ArtisteArtistIdRoute: typeof ArtisteArtistIdRoute
   CollecteArtistIdRoute: typeof CollecteArtistIdRoute
   ExtractionsArtistIdRoute: typeof ExtractionsArtistIdRoute
@@ -122,6 +135,13 @@ declare module '@tanstack/react-router' {
       path: '/connexion'
       fullPath: '/connexion'
       preLoaderRoute: typeof ConnexionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/membres': {
+      id: '/membres'
+      path: '/membres'
+      fullPath: '/membres'
+      preLoaderRoute: typeof MembresRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/artiste/$artistId': {
@@ -158,6 +178,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ConnexionRoute: ConnexionRoute,
+  MembresRoute: MembresRoute,
   ArtisteArtistIdRoute: ArtisteArtistIdRoute,
   CollecteArtistIdRoute: CollecteArtistIdRoute,
   ExtractionsArtistIdRoute: ExtractionsArtistIdRoute,
@@ -166,13 +187,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
