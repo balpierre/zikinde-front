@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ConnexionRouteImport } from './routes/connexion'
+import { Route as LabelRouteImport } from './routes/label'
 import { Route as ArtisteArtistIdRouteImport } from './routes/artiste.$artistId'
 import { Route as CollecteArtistIdRouteImport } from './routes/collecte.$artistId'
 import { Route as ExtractionsIndexRouteImport } from './routes/extractions.index'
@@ -24,6 +25,11 @@ const IndexRoute = IndexRouteImport.update({
 const ConnexionRoute = ConnexionRouteImport.update({
   id: '/connexion',
   path: '/connexion',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LabelRoute = LabelRouteImport.update({
+  id: '/label',
+  path: '/label',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ArtisteArtistIdRoute = ArtisteArtistIdRouteImport.update({
@@ -50,6 +56,7 @@ const ExtractionsArtistIdRoute = ExtractionsArtistIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/connexion': typeof ConnexionRoute
+  '/label': typeof LabelRoute
   '/artiste/$artistId': typeof ArtisteArtistIdRoute
   '/collecte/$artistId': typeof CollecteArtistIdRoute
   '/extractions/$artistId': typeof ExtractionsArtistIdRoute
@@ -58,6 +65,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/connexion': typeof ConnexionRoute
+  '/label': typeof LabelRoute
   '/artiste/$artistId': typeof ArtisteArtistIdRoute
   '/collecte/$artistId': typeof CollecteArtistIdRoute
   '/extractions/$artistId': typeof ExtractionsArtistIdRoute
@@ -67,6 +75,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/connexion': typeof ConnexionRoute
+  '/label': typeof LabelRoute
   '/artiste/$artistId': typeof ArtisteArtistIdRoute
   '/collecte/$artistId': typeof CollecteArtistIdRoute
   '/extractions/$artistId': typeof ExtractionsArtistIdRoute
@@ -77,6 +86,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/connexion'
+    | '/label'
     | '/artiste/$artistId'
     | '/collecte/$artistId'
     | '/extractions/$artistId'
@@ -85,6 +95,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/connexion'
+    | '/label'
     | '/artiste/$artistId'
     | '/collecte/$artistId'
     | '/extractions/$artistId'
@@ -93,6 +104,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/connexion'
+    | '/label'
     | '/artiste/$artistId'
     | '/collecte/$artistId'
     | '/extractions/$artistId'
@@ -102,6 +114,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ConnexionRoute: typeof ConnexionRoute
+  LabelRoute: typeof LabelRoute
   ArtisteArtistIdRoute: typeof ArtisteArtistIdRoute
   CollecteArtistIdRoute: typeof CollecteArtistIdRoute
   ExtractionsArtistIdRoute: typeof ExtractionsArtistIdRoute
@@ -122,6 +135,13 @@ declare module '@tanstack/react-router' {
       path: '/connexion'
       fullPath: '/connexion'
       preLoaderRoute: typeof ConnexionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/label': {
+      id: '/label'
+      path: '/label'
+      fullPath: '/label'
+      preLoaderRoute: typeof LabelRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/artiste/$artistId': {
@@ -158,6 +178,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ConnexionRoute: ConnexionRoute,
+  LabelRoute: LabelRoute,
   ArtisteArtistIdRoute: ArtisteArtistIdRoute,
   CollecteArtistIdRoute: CollecteArtistIdRoute,
   ExtractionsArtistIdRoute: ExtractionsArtistIdRoute,

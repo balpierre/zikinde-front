@@ -33,6 +33,14 @@ import {
   metadata,
 } from "@/components/label-pulse/shared";
 import { RequireAuth } from "@/components/extractions/require-auth";
+import { BandeauProfilLabel, FiltrePerimetre } from "@/components/extractions/filtre-label";
+import { usePerimetreLabel } from "@/hooks/use-perimetre-label";
+import {
+  appartientAuPerimetre,
+  perimetreSearch,
+  scopeAnomalie,
+  type PerimetreLabel,
+} from "@/lib/label";
 import { getArtist } from "@/lib/backend";
 import {
   referentielQuery,
@@ -48,6 +56,7 @@ interface ArtistSearch {
   vue?: "genealogie" | "graphe" | "anomalies";
   oeuvre?: string;
   anomalie?: string;
+  perimetre?: PerimetreLabel;
 }
 export const Route = createFileRoute("/artiste/$artistId")({
   ssr: false,
@@ -59,6 +68,7 @@ export const Route = createFileRoute("/artiste/$artistId")({
       : {}),
     ...(typeof search["oeuvre"] === "string" ? { oeuvre: search["oeuvre"] } : {}),
     ...(typeof search["anomalie"] === "string" ? { anomalie: search["anomalie"] } : {}),
+    ...perimetreSearch(search),
   }),
   head: () =>
     metadata(
@@ -106,6 +116,11 @@ function Artiste() {
   const anomaliesActive = search.vue === "anomalies";
   const overviewActive = !genealogyActive && !graphActive && !anomaliesActive;
   const suivi = useQuery({ queryKey: ["artiste", artistId], queryFn: () => getArtist(artistId) });
+  const label = usePerimetreLabel({
+    orgId: suivi.data?.org_id,
+    valeurUrl: search.perimetre,
+    changer: (perimetre) => void navigate({ search: (prev) => ({ ...prev, perimetre }) }),
+  });
   const query = useQuery(referentielQuery(artistId));
   const result = query.data ?? { data: null, state: query.isError ? "unavailable" : "loading" };
   const { data } = result;
@@ -245,16 +260,35 @@ function Artiste() {
       ) : graphActive && data ? (
         <Graphe data={data} />
       ) : anomaliesActive && data ? (
-        <Anomalies
-          data={data}
-          selected={search.anomalie}
-          decisions={decisions}
-          modifier={modifier}
-          persistant={persistant}
-          onSelect={(id) =>
-            void navigate({ search: { vue: "anomalies", ...(id ? { anomalie: id } : {}) } })
-          }
-        />
+        <>
+          {!label.renseigne && <BandeauProfilLabel orgId={suivi.data?.org_id} />}
+          {label.renseigne && (
+            <div className="mb-6">
+              <FiltrePerimetre valeur={label.perimetre} onChange={label.changer} />
+            </div>
+          )}
+          <Anomalies
+            data={{
+              ...data,
+              anomalies: data.anomalies.filter((a) =>
+                appartientAuPerimetre(scopeAnomalie(a.scope), label.perimetre),
+              ),
+            }}
+            selected={search.anomalie}
+            decisions={decisions}
+            modifier={modifier}
+            persistant={persistant}
+            onSelect={(id) =>
+              void navigate({
+                search: {
+                  vue: "anomalies",
+                  ...(search.perimetre ? { perimetre: search.perimetre } : {}),
+                  ...(id ? { anomalie: id } : {}),
+                },
+              })
+            }
+          />
+        </>
       ) : overviewActive ? (
         <>
           <section className="reference-section">

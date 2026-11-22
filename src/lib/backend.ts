@@ -419,3 +419,62 @@ export async function deleteManualImport(importId: string): Promise<void> {
   const { error } = await supabase().rpc("delete_manual_import", { p_import: importId });
   check(error);
 }
+
+// ------------------------------------------------------------------ label client
+
+/** Profil du label (table `label_profiles`, lecture RLS). Absent du back avant déploiement : traité comme vide. */
+export interface LabelProfile {
+  org_id: string;
+  names: string[];
+  upc_prefixes: string[];
+  isrc_registrants: string[];
+  updated_at: string;
+}
+
+export async function getLabelProfile(orgId: string): Promise<LabelProfile | null> {
+  return unwrap(
+    await supabase()
+      .from("label_profiles")
+      .select("org_id, names, upc_prefixes, isrc_registrants, updated_at")
+      .eq("org_id", orgId)
+      .maybeSingle(),
+  ) as LabelProfile | null;
+}
+
+/** Enregistre le profil ; le back met en file un recalcul de chaque artiste suivi du label. */
+export async function setLabelProfile(
+  orgId: string,
+  profil: { names: string[]; upc_prefixes: string[]; isrc_registrants: string[] },
+): Promise<void> {
+  const { error } = await supabase().rpc("set_label_profile", {
+    p_org: orgId,
+    p_names: profil.names,
+    p_upc_prefixes: profil.upc_prefixes,
+    p_isrc_registrants: profil.isrc_registrants,
+  });
+  check(error);
+}
+
+/**
+ * Appartenance brute (`attributes.ownership` de l’entité) par ligne de catalogue, indexée par
+ * `entity_type|source|source_id`. Lue dans `v_artist_entities`, comme les liens de titres.
+ */
+export async function getAppartenances(artistId: string): Promise<Record<string, unknown>> {
+  const rows = unwrap(
+    await supabase()
+      .from("v_artist_entities")
+      .select("entity_type, attributes, sources")
+      .eq("org_artist_id", artistId),
+  ) as {
+    entity_type: string;
+    attributes: Record<string, unknown> | null;
+    sources: { source: string; source_id: string }[];
+  }[];
+  const index: Record<string, unknown> = {};
+  for (const row of rows) {
+    const ownership = row.attributes?.["ownership"];
+    if (ownership === undefined) continue;
+    for (const s of row.sources) index[`${row.entity_type}|${s.source}|${s.source_id}`] = ownership;
+  }
+  return index;
+}

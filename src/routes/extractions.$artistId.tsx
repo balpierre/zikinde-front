@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -48,7 +48,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Shell, metadata } from "@/components/label-pulse/shared";
 import { RequireAuth } from "@/components/extractions/require-auth";
 import { ComptesSources, RevueEtat } from "@/components/extractions/comptes-sources";
+import { BadgeAppartenance } from "@/components/extractions/appartenance";
+import { BandeauProfilLabel, FiltrePerimetre } from "@/components/extractions/filtre-label";
 import { useRevue, type Revue } from "@/hooks/use-revue";
+import { usePerimetreLabel, type EtatLabel } from "@/hooks/use-perimetre-label";
 import {
   countCatalog,
   decideLink,
@@ -61,12 +64,19 @@ import {
   requestReconcile,
   waitJob,
   watchJob,
+  type Anomaly,
   type CatalogItem,
   type CatalogType,
   type Job,
   type StepInfo,
   type StepStatus,
 } from "@/lib/backend";
+import {
+  appartientAuPerimetre,
+  lireAppartenance,
+  perimetreSearch,
+  scopeAnomalie,
+} from "@/lib/label";
 import {
   anomaliesTypes,
   artistesStatuts,
@@ -81,6 +91,7 @@ import { referentielQuery } from "@/lib/referentiel";
 
 export const Route = createFileRoute("/extractions/$artistId")({
   ssr: false,
+  validateSearch: perimetreSearch,
   head: () => metadata("Extraction", "Progression et résultats de l’extraction d’un artiste."),
   component: () => (
     <Shell active="extractions">
@@ -108,6 +119,14 @@ function Extraction() {
   const artist = useQuery({ queryKey: ["artiste", artistId], queryFn: () => getArtist(artistId) });
   const [job, setJob] = useState<Job | null>(null);
   const [relaunching, setRelaunching] = useState(false);
+  const navigate = useNavigate({ from: "/extractions/$artistId" });
+  const search = Route.useSearch();
+  const label = usePerimetreLabel({
+    orgId: artist.data?.org_id,
+    artistId,
+    valeurUrl: search.perimetre,
+    changer: (perimetre) => void navigate({ search: (prev) => ({ ...prev, perimetre }) }),
+  });
 
   const jobId = artist.data?.last_job_id ?? null;
   const active = job
@@ -233,6 +252,8 @@ function Extraction() {
       {!active && a.status === "ready" && (
         <Results
           artistId={artistId}
+          orgId={a.org_id}
+          label={label}
           knownIds={a.known_ids}
           onCollecte={() => {
             // Une collecte complète vient d’être relancée (réintégration d’un compte) : on suit son job.
@@ -307,10 +328,14 @@ function stepDetail(step: StepInfo): string {
 
 function Results({
   artistId,
+  orgId,
+  label,
   knownIds,
   onCollecte,
 }: {
   artistId: string;
+  orgId: string;
+  label: EtatLabel;
   knownIds: Record<string, string[]>;
   onCollecte: () => void;
 }) {
@@ -330,6 +355,15 @@ function Results({
     queryFn: () => getAnomalies(artistId),
   });
   const ids = Object.entries(knownIds).sort(([x], [y]) => x.localeCompare(y));
+  const anomaliesDuPerimetre = (anomalies.data ?? []).filter((an) =>
+    appartientAuPerimetre(scopeAnomalie(an.details["scope"]), label.perimetre),
+  );
+  const aTraiter = anomaliesDuPerimetre.filter(
+    (an) => scopeAnomalie(an.details["scope"]) === "client",
+  );
+  const pourInformation = anomaliesDuPerimetre.filter(
+    (an) => scopeAnomalie(an.details["scope"]) !== "client",
+  );
 
   return (
     <>
@@ -352,6 +386,13 @@ function Results({
         </div>
       </section>
 
+      {!label.renseigne && <BandeauProfilLabel orgId={orgId} />}
+      {label.renseigne && (
+        <div className="mt-8">
+          <FiltrePerimetre valeur={label.perimetre} onChange={label.changer} />
+        </div>
+      )}
+
       <RevueEtat revue={revue} />
       <ComptesSources
         comptes={accounts.data ?? []}
@@ -372,26 +413,28 @@ function Results({
             Aucune anomalie détectée par les règles actuelles.
           </p>
         )}
-        <ul className="grid gap-2">
-          {anomalies.data?.map((an) => (
-            <li key={an.id} className="flex gap-3 rounded-lg border p-3 text-sm">
-              <AlertTriangle size={18} className="shrink-0 text-amber-600" />
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <strong>
-                    {typeof an.details["title"] === "string"
-                      ? an.details["title"]
-                      : (anomaliesTypes[an.kind] ?? an.kind)}
-                  </strong>
-                  <span className="rounded border px-1.5 text-xs text-muted-foreground">
-                    {graviteFr[an.severity] ?? an.severity}
-                  </span>
-                </div>
-                <AnomalyDetails details={an.details} />
-              </div>
-            </li>
-          ))}
-        </ul>
+        {anomalies.data && (
+          <>
+            <h3 className="mb-1 font-medium">
+              À traiter <span className="text-muted-foreground">({nombre(aTraiter.length)})</span>
+            </h3>
+            {label.renseigne && (
+              <p className="mb-2 text-sm text-muted-foreground">
+                Anomalies sur votre catalogue. Les autres ne sont données qu’à titre d’information.
+              </p>
+            )}
+            <ListeAnomalies anomalies={aTraiter} />
+            {pourInformation.length > 0 && (
+              <>
+                <h3 className="mb-2 mt-6 font-medium">
+                  Pour information{" "}
+                  <span className="text-muted-foreground">({nombre(pourInformation.length)})</span>
+                </h3>
+                <ListeAnomalies anomalies={pourInformation} />
+              </>
+            )}
+          </>
+        )}
       </section>
 
       <section className="mt-10" aria-labelledby="catalog-title">
@@ -414,12 +457,37 @@ function Results({
           </TabsList>
           {(["recording", "release", "release_group", "work"] as CatalogType[]).map((t) => (
             <TabsContent key={t} value={t}>
-              <CatalogTable artistId={artistId} type={t} revue={revue} />
+              <CatalogTable artistId={artistId} type={t} revue={revue} label={label} />
             </TabsContent>
           ))}
         </Tabs>
       </section>
     </>
+  );
+}
+
+function ListeAnomalies({ anomalies }: { anomalies: Anomaly[] }) {
+  return (
+    <ul className="grid gap-2">
+      {anomalies.map((an) => (
+        <li key={an.id} className="flex gap-3 rounded-lg border p-3 text-sm">
+          <AlertTriangle size={18} className="shrink-0 text-amber-600" />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <strong>
+                {typeof an.details["title"] === "string"
+                  ? an.details["title"]
+                  : (anomaliesTypes[an.kind] ?? an.kind)}
+              </strong>
+              <span className="rounded border px-1.5 text-xs text-muted-foreground">
+                {graviteFr[an.severity] ?? an.severity}
+              </span>
+            </div>
+            <AnomalyDetails details={an.details} />
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -513,14 +581,21 @@ function identifier(item: CatalogItem, scheme: string): string {
     .join(", ");
 }
 
+/** Clé d’une ligne de catalogue dans l’index des appartenances (`v_artist_entities`). */
+function cleAppartenance(item: CatalogItem): string {
+  return `${item.entity_type}|${item.source}|${item.source_id}`;
+}
+
 function CatalogTable({
   artistId,
   type,
   revue,
+  label,
 }: {
   artistId: string;
   type: CatalogType;
   revue: Revue;
+  label: EtatLabel;
 }) {
   const items = useQuery({
     queryKey: ["resultats", artistId, "catalogue", type],
@@ -536,11 +611,15 @@ function CatalogTable({
     const f = filter.trim().toLowerCase();
     return (items.data ?? []).filter(
       (i) =>
-        !f ||
-        i.name.toLowerCase().includes(f) ||
-        i.identifiers.some((id) => id.value.toLowerCase().includes(f)),
+        (!f ||
+          i.name.toLowerCase().includes(f) ||
+          i.identifiers.some((id) => id.value.toLowerCase().includes(f))) &&
+        appartientAuPerimetre(
+          lireAppartenance(label.appartenances[cleAppartenance(i)]).statut,
+          label.perimetre,
+        ),
     );
-  }, [items.data, filter]);
+  }, [items.data, filter, label.appartenances, label.perimetre]);
   const code =
     type === "recording" ? "isrc" : type === "release" ? "upc" : type === "work" ? "iswc" : null;
 
@@ -579,7 +658,15 @@ function CatalogTable({
                   : null;
             return (
               <TableRow key={item.source_entity_id}>
-                <TableCell className="font-medium">{item.name}</TableCell>
+                <TableCell className="font-medium">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {item.name}
+                    <BadgeAppartenance
+                      appartenance={lireAppartenance(label.appartenances[cleAppartenance(item)])}
+                      renseigne={label.renseigne}
+                    />
+                  </div>
+                </TableCell>
                 <TableCell>{nomSource(item.source)}</TableCell>
                 {code && (
                   <TableCell className="mono text-xs">

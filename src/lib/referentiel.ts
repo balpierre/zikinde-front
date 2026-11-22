@@ -33,6 +33,8 @@ export interface Meta {
   sources?: Source[];
   notes?: string[];
   set_aside?: SetAside[];
+  /** Profil du label client (plan 02) ; absent avant déploiement du back. */
+  label_profile?: { names: string[]; upc_prefixes: string[]; isrc_registrants: string[] };
 }
 export interface Stats {
   works?: number;
@@ -41,6 +43,8 @@ export interface Stats {
   anomalies?: number;
   works_with_iswc?: number;
   recordings_with_isrc?: number;
+  /** Sorties et enregistrements par appartenance (plan 02) ; absent avant déploiement. */
+  ownership?: Record<string, number>;
 }
 export interface MatrixValue {
   value: string | string[] | number | null;
@@ -100,6 +104,8 @@ export interface Anomaly {
   field?: string;
   target?: string;
   observations?: Observation[];
+  /** Périmètre de l’anomalie (plan 02) : « client » = à traiter ; absent avant déploiement. */
+  scope?: string;
 }
 export interface Observation {
   source: Source;
@@ -251,6 +257,13 @@ const rawSchema = z.object({
     ),
     model: z.record(z.unknown()).optional(),
     notes: z.array(z.string()).default([]),
+    label_profile: z
+      .object({
+        names: z.array(z.string()).default([]),
+        upc_prefixes: z.array(z.string()).default([]),
+        isrc_registrants: z.array(z.string()).default([]),
+      })
+      .nullish(),
   }),
   focus_artist: z.string(),
   stats: z
@@ -261,6 +274,7 @@ const rawSchema = z.object({
       anomalies: z.number().optional(),
       recordings_with_isrc: z.number().optional(),
       works_with_iswc: z.number().optional(),
+      ownership: z.record(z.number()).optional(),
     })
     .passthrough(),
   nodes: z.array(
@@ -324,6 +338,7 @@ const rawSchema = z.object({
       target: z.string().default(""),
       suggested_action: z.string().default(""),
       items: z.array(z.record(z.unknown())).default([]),
+      scope: z.string().optional(),
     }),
   ),
 });
@@ -430,6 +445,7 @@ function normaliser(raw: ReferentielFichier): Referentiel {
       collected_at: raw.meta.generated_at,
       notes: raw.meta.notes,
       sources: metaSources,
+      ...(raw.meta.label_profile ? { label_profile: raw.meta.label_profile } : {}),
     },
     stats: {
       works: raw.stats.nodes_by_type["work"] ?? 0,
@@ -440,6 +456,7 @@ function normaliser(raw: ReferentielFichier): Referentiel {
       ...(raw.stats.recordings_with_isrc != null
         ? { recordings_with_isrc: raw.stats.recordings_with_isrc }
         : {}),
+      ...(raw.stats.ownership ? { ownership: raw.stats.ownership } : {}),
     },
     matrix,
     nodes,
@@ -472,6 +489,7 @@ function normaliser(raw: ReferentielFichier): Referentiel {
         field: a.field,
         target: a.target,
         observations,
+        ...(a.scope ? { scope: a.scope } : {}),
       };
     }),
   };

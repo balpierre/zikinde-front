@@ -9,6 +9,7 @@ import {
   FileMusic,
   Search,
   ShieldCheck,
+  Tag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -33,7 +34,7 @@ export function Shell({
   active = "search",
 }: {
   children: React.ReactNode;
-  active?: "search" | "reference" | "extractions";
+  active?: "search" | "reference" | "extractions" | "label";
 }) {
   const { session } = useSession();
   return (
@@ -56,6 +57,12 @@ export function Shell({
               <Link to="/extractions">
                 <ListChecks />
                 Extractions
+              </Link>
+            </Button>
+            <Button variant="ghost" asChild className={active === "label" ? "nav-active" : ""}>
+              <Link to="/label">
+                <Tag />
+                Mon label
               </Link>
             </Button>
             {session ? (
