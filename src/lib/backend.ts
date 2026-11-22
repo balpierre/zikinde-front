@@ -39,6 +39,10 @@ export interface Candidate {
   evidence: {
     type?: string | null;
     area?: string | null;
+    /** Pays (ISO 3166-1 alpha-2 ou libellé) : champs ajoutés au back, optionnels avant déploiement. */
+    country?: string | null;
+    /** Début d’activité tel que la source le donne (« 1998 », « 1998-05-04 »). */
+    life_span?: { begin?: string | null };
     disambiguation?: string | null;
     isnis?: string[];
     aliases?: string[];
@@ -67,13 +71,21 @@ export interface Identifier {
   value: string;
 }
 
+export type LinkStatus = "validated" | "proposed" | "rejected";
+
+/** Compte d’un artiste dans une source (`v_artist_sources`). Les champs `reason` et `score` arrivent avec le back. */
 export interface SourceAccount {
+  link_id: number;
   source: string;
   source_id: string;
   name: string;
   url: string | null;
   method: string;
-  link_status: string;
+  link_status: LinkStatus;
+  /** Raison lisible de la mise de côté (comptes `proposed`). */
+  reason?: string | null;
+  /** Cohérence avec le compte choisi, 0..1 ; null si non calculée. */
+  score?: number | null;
   attributes: Record<string, unknown>;
   identifiers: Identifier[];
 }
@@ -270,6 +282,40 @@ export async function refreshArtist(artistId: string): Promise<string> {
   return unwrap(await supabase().rpc("refresh_artist", { p_artist: artistId })) as string;
 }
 
+/** Relance la réconciliation de l’artiste (référentiel recalculé) ; renvoie l’uuid du job. */
+export async function requestReconcile(artistId: string): Promise<string> {
+  return unwrap(await supabase().rpc("request_reconcile", { p_artist: artistId })) as string;
+}
+
+/** Retire un compte source de l’artiste (« ce n’est pas mon artiste ») ; renvoie l’uuid du job `reconcile`. */
+export async function rejectAccount(linkId: number): Promise<string> {
+  return unwrap(await supabase().rpc("reject_account", { p_link: linkId })) as string;
+}
+
+/** Réintègre un compte mis de côté et relance une collecte complète ; renvoie l’uuid du job `collect`. */
+export async function acceptAccount(linkId: number): Promise<string> {
+  return unwrap(await supabase().rpc("accept_account", { p_link: linkId })) as string;
+}
+
+/**
+ * Valide ou refuse un autre nom proposé (« C’est lui » / « Ce n’est pas lui »). Renvoie l’uuid du job :
+ * `collect` après validation, `reconcile` après refus.
+ */
+export async function decideAlias(
+  linkId: number,
+  status: "validated" | "rejected",
+): Promise<string> {
+  return unwrap(
+    await supabase().rpc("decide_alias", { p_link: linkId, p_status: status }),
+  ) as string;
+}
+
+/** Valide, refuse ou remet en attente un rapprochement (compte ou titre). */
+export async function decideLink(linkId: number, status: LinkStatus): Promise<void> {
+  const { error } = await supabase().rpc("decide_link", { p_link: linkId, p_status: status });
+  check(error);
+}
+
 // ------------------------------------------------------------------ lecture
 
 export async function listArtists(orgId: string): Promise<OrgArtist[]> {
@@ -288,13 +334,29 @@ export async function getArtist(artistId: string): Promise<OrgArtist | null> {
   ) as OrgArtist | null;
 }
 
+/**
+ * Comptes validés et mis de côté. Sélection `*` volontaire : `reason` et `score` n’existent qu’après la
+ * migration `20261121000500_homonymes` ; une liste explicite ferait échouer la lecture avant déploiement.
+ */
 export async function getSourceAccounts(artistId: string): Promise<SourceAccount[]> {
   return unwrap(
-    await supabase()
-      .from("v_artist_sources")
-      .select("source, source_id, name, url, method, link_status, attributes, identifiers")
-      .eq("org_artist_id", artistId),
+    await supabase().from("v_artist_sources").select("*").eq("org_artist_id", artistId),
   ) as SourceAccount[];
+}
+
+/**
+ * Identifiant de lien de chaque titre du catalogue, indexé par `source|source_id`.
+ * Le catalogue (`v_artist_catalog`) n’expose pas `link_id` ; on le lit dans `v_artist_entities`.
+ */
+export async function getTitleLinks(artistId: string): Promise<Record<string, number>> {
+  const rows = unwrap(
+    await supabase().from("v_artist_entities").select("sources").eq("org_artist_id", artistId),
+  ) as { sources: { source: string; source_id: string; link_id: number }[] }[];
+  const links: Record<string, number> = {};
+  for (const row of rows) {
+    for (const s of row.sources) links[`${s.source}|${s.source_id}`] = s.link_id;
+  }
+  return links;
 }
 
 export async function countCatalog(artistId: string): Promise<Record<CatalogType, number>> {
@@ -406,4 +468,63 @@ export async function createManualImport(
 export async function deleteManualImport(importId: string): Promise<void> {
   const { error } = await supabase().rpc("delete_manual_import", { p_import: importId });
   check(error);
+}
+
+// ------------------------------------------------------------------ label client
+
+/** Profil du label (table `label_profiles`, lecture RLS). Absent du back avant déploiement : traité comme vide. */
+export interface LabelProfile {
+  org_id: string;
+  names: string[];
+  upc_prefixes: string[];
+  isrc_registrants: string[];
+  updated_at: string;
+}
+
+export async function getLabelProfile(orgId: string): Promise<LabelProfile | null> {
+  return unwrap(
+    await supabase()
+      .from("label_profiles")
+      .select("org_id, names, upc_prefixes, isrc_registrants, updated_at")
+      .eq("org_id", orgId)
+      .maybeSingle(),
+  ) as LabelProfile | null;
+}
+
+/** Enregistre le profil ; le back met en file un recalcul de chaque artiste suivi du label. */
+export async function setLabelProfile(
+  orgId: string,
+  profil: { names: string[]; upc_prefixes: string[]; isrc_registrants: string[] },
+): Promise<void> {
+  const { error } = await supabase().rpc("set_label_profile", {
+    p_org: orgId,
+    p_names: profil.names,
+    p_upc_prefixes: profil.upc_prefixes,
+    p_isrc_registrants: profil.isrc_registrants,
+  });
+  check(error);
+}
+
+/**
+ * Appartenance brute (`attributes.ownership` de l’entité) par ligne de catalogue, indexée par
+ * `entity_type|source|source_id`. Lue dans `v_artist_entities`, comme les liens de titres.
+ */
+export async function getAppartenances(artistId: string): Promise<Record<string, unknown>> {
+  const rows = unwrap(
+    await supabase()
+      .from("v_artist_entities")
+      .select("entity_type, attributes, sources")
+      .eq("org_artist_id", artistId),
+  ) as {
+    entity_type: string;
+    attributes: Record<string, unknown> | null;
+    sources: { source: string; source_id: string }[];
+  }[];
+  const index: Record<string, unknown> = {};
+  for (const row of rows) {
+    const ownership = row.attributes?.["ownership"];
+    if (ownership === undefined) continue;
+    for (const s of row.sources) index[`${row.entity_type}|${s.source}|${s.source_id}`] = ownership;
+  }
+  return index;
 }

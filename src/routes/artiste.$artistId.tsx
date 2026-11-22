@@ -37,6 +37,14 @@ import {
   metadata,
 } from "@/components/label-pulse/shared";
 import { RequireAuth } from "@/components/extractions/require-auth";
+import { BandeauProfilLabel, FiltrePerimetre } from "@/components/extractions/filtre-label";
+import { usePerimetreLabel } from "@/hooks/use-perimetre-label";
+import {
+  appartientAuPerimetre,
+  perimetreSearch,
+  scopeAnomalie,
+  type PerimetreLabel,
+} from "@/lib/label";
 import { getArtist } from "@/lib/backend";
 import {
   referentielQuery,
@@ -44,8 +52,10 @@ import {
   plateformes,
   sourceInfo,
   sourcesCatalogue,
+  variantesDeNom,
   type MatrixValue,
 } from "@/lib/referentiel";
+import { AussiConnuSous } from "@/components/label-pulse/aussi-connu-sous";
 import { categories, statuts, statutsFermes, nombre, couverture } from "@/lib/libelles";
 import {
   getDivergentFields,
@@ -58,6 +68,7 @@ interface ArtistSearch {
   vue?: "genealogie" | "graphe" | "anomalies";
   oeuvre?: string;
   anomalie?: string;
+  perimetre?: PerimetreLabel;
   correction?: string;
   type?: "recording" | "release";
   entite?: string;
@@ -72,6 +83,7 @@ export const Route = createFileRoute("/artiste/$artistId")({
       : {}),
     ...(typeof search["oeuvre"] === "string" ? { oeuvre: search["oeuvre"] } : {}),
     ...(typeof search["anomalie"] === "string" ? { anomalie: search["anomalie"] } : {}),
+    ...perimetreSearch(search),
     ...(search["type"] === "recording" || search["type"] === "release"
       ? { type: search["type"] }
       : {}),
@@ -124,9 +136,15 @@ function Artiste() {
   const anomaliesActive = search.vue === "anomalies";
   const overviewActive = !genealogyActive && !graphActive && !anomaliesActive;
   const suivi = useQuery({ queryKey: ["artiste", artistId], queryFn: () => getArtist(artistId) });
+  const label = usePerimetreLabel({
+    orgId: suivi.data?.org_id,
+    valeurUrl: search.perimetre,
+    changer: (perimetre) => void navigate({ search: (prev) => ({ ...prev, perimetre }) }),
+  });
   const query = useQuery(referentielQuery(artistId));
   const result = query.data ?? { data: null, state: query.isError ? "unavailable" : "loading" };
   const { data } = result;
+  const setAside = data?.meta.set_aside ?? [];
   const sources = sourcesMatrice(data);
   const artist = data?.nodes.find((node) =>
     data.meta.focus_artist ? node.id === data.meta.focus_artist : node.type === "artist",
@@ -158,6 +176,7 @@ function Artiste() {
             {data?.meta.artist_name ?? artist?.label ?? suivi.data?.name ?? "Artiste"}
             <span className="heading-dot">.</span>
           </h1>
+          <AussiConnuSous noms={data ? variantesDeNom(data.meta) : []} />
           <p>{data?.meta.description ?? "Identité et catalogue en attente de vérification"}</p>
           <SourceBadges sources={artist?.sources ?? []} />
           <div className="genre-list">
@@ -182,6 +201,15 @@ function Artiste() {
           </Button>
         </div>
       </div>
+      {setAside.length > 0 && (
+        <p role="status" className="mt-4 rounded-lg border p-3 text-sm">
+          {nombre(setAside.length)} compte{setAside.length > 1 ? "s" : ""} mis de côté : ils
+          n’alimentent pas ce référentiel.{" "}
+          <Link to="/extractions/$artistId" params={{ artistId }} className="underline">
+            Les examiner
+          </Link>
+        </p>
+      )}
       {data && <Jauges jauges={getGauges(data)} />}
       <Concepts compact />
       <div className="artist-tabs" role="tablist" aria-label="Vues du référentiel">
@@ -261,17 +289,36 @@ function Artiste() {
           entite={search.entite}
         />
       ) : anomaliesActive && data ? (
-        <Anomalies
-          data={data}
-          selected={search.anomalie}
-          correction={search.correction}
-          decisions={decisions}
-          modifier={modifier}
-          persistant={persistant}
-          onSelect={(id) =>
-            void navigate({ search: { vue: "anomalies", ...(id ? { anomalie: id } : {}) } })
-          }
-        />
+        <>
+          {!label.renseigne && <BandeauProfilLabel orgId={suivi.data?.org_id} />}
+          {label.renseigne && (
+            <div className="mb-6">
+              <FiltrePerimetre valeur={label.perimetre} onChange={label.changer} />
+            </div>
+          )}
+          <Anomalies
+            data={{
+              ...data,
+              anomalies: data.anomalies.filter((a) =>
+                appartientAuPerimetre(scopeAnomalie(a.scope), label.perimetre),
+              ),
+            }}
+            selected={search.anomalie}
+            correction={search.correction}
+            decisions={decisions}
+            modifier={modifier}
+            persistant={persistant}
+            onSelect={(id) =>
+              void navigate({
+                search: {
+                  vue: "anomalies",
+                  ...(search.perimetre ? { perimetre: search.perimetre } : {}),
+                  ...(id ? { anomalie: id } : {}),
+                },
+              })
+            }
+          />
+        </>
       ) : overviewActive ? (
         <>
           {data && (

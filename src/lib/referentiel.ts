@@ -13,6 +13,28 @@ export interface Source {
   count?: number;
   contribution?: string;
 }
+/** Compte mis de côté (homonyme probable ou refusé par un humain) : il n’alimente pas le référentiel. */
+export interface SetAside {
+  link_id: number;
+  source: string;
+  source_id: string;
+  name: string;
+  url?: string | null;
+  status: string;
+  reason?: string | null;
+  score?: number | null;
+}
+/** Autre nom de l’artiste : compte déclaré par une source (alias, projet). Jamais le nom civil. */
+export interface Alias {
+  link_id: number;
+  source: string;
+  source_id: string;
+  name: string;
+  url: string | null;
+  /** `proposed` (à vérifier), `validated` (retenu) ou `rejected` (refusé). */
+  status: string;
+  reason: string | null;
+}
 export interface Meta {
   focus_artist?: string;
   artist_name?: string;
@@ -21,6 +43,13 @@ export interface Meta {
   collected_at?: string;
   sources?: Source[];
   notes?: string[];
+  set_aside?: SetAside[];
+  /** Profil du label client (plan 02) ; absent avant déploiement du back. */
+  label_profile?: { names: string[]; upc_prefixes: string[]; isrc_registrants: string[] };
+  /** Autres noms proposés, retenus ou refusés. Absent avant déploiement du back alias. */
+  aliases?: Alias[];
+  /** Variantes du nom (union dédoublonnée des sources). Absent avant déploiement du back alias. */
+  name_variants?: string[];
 }
 export interface Stats {
   works?: number;
@@ -29,6 +58,8 @@ export interface Stats {
   anomalies?: number;
   works_with_iswc?: number;
   recordings_with_isrc?: number;
+  /** Sorties et enregistrements par appartenance (plan 02) ; absent avant déploiement. */
+  ownership?: Record<string, number>;
 }
 export interface MatrixValue {
   value: string | string[] | number | null;
@@ -88,6 +119,8 @@ export interface Anomaly {
   field?: string;
   target?: string;
   observations?: Observation[];
+  /** Périmètre de l’anomalie (plan 02) : « client » = à traiter ; absent avant déploiement. */
+  scope?: string;
 }
 export interface Observation {
   source: Source;
@@ -125,6 +158,22 @@ const schema = z.object({
     collected_at: z.string().optional(),
     notes: z.array(z.string()).optional(),
     sources,
+    // Lu avec tolérance : un élément mal formé ne doit pas rendre tout le référentiel « invalide ».
+    set_aside: z
+      .array(
+        z.object({
+          link_id: z.number(),
+          source: z.string(),
+          source_id: z.string(),
+          name: z.string(),
+          url: z.string().nullish(),
+          status: z.string(),
+          reason: z.string().nullish(),
+          score: z.number().nullish(),
+        }),
+      )
+      .optional()
+      .catch(undefined),
   }),
   stats: z.object({
     works: z.number().optional(),
@@ -223,6 +272,29 @@ const rawSchema = z.object({
     ),
     model: z.record(z.unknown()).optional(),
     notes: z.array(z.string()).default([]),
+    label_profile: z
+      .object({
+        names: z.array(z.string()).default([]),
+        upc_prefixes: z.array(z.string()).default([]),
+        isrc_registrants: z.array(z.string()).default([]),
+      })
+      .nullish(),
+    // Optionnels et tolérants : absents ou mal formés, ils masquent seulement la section concernée.
+    aliases: z
+      .array(
+        z.object({
+          source: z.string(),
+          source_id: z.string(),
+          name: z.string(),
+          url: z.string().nullish(),
+          status: z.string(),
+          reason: z.string().nullish(),
+          link_id: z.number(),
+        }),
+      )
+      .optional()
+      .catch(undefined),
+    name_variants: z.array(z.string()).optional().catch(undefined),
   }),
   focus_artist: z.string(),
   stats: z
@@ -233,6 +305,7 @@ const rawSchema = z.object({
       anomalies: z.number().optional(),
       recordings_with_isrc: z.number().optional(),
       works_with_iswc: z.number().optional(),
+      ownership: z.record(z.number()).optional(),
     })
     .passthrough(),
   nodes: z.array(
@@ -296,6 +369,7 @@ const rawSchema = z.object({
       target: z.string().default(""),
       suggested_action: z.string().default(""),
       items: z.array(z.record(z.unknown())).default([]),
+      scope: z.string().optional(),
     }),
   ),
 });
@@ -402,6 +476,21 @@ function normaliser(raw: ReferentielFichier): Referentiel {
       collected_at: raw.meta.generated_at,
       notes: raw.meta.notes,
       sources: metaSources,
+      ...(raw.meta.label_profile ? { label_profile: raw.meta.label_profile } : {}),
+      ...(raw.meta.aliases
+        ? {
+            aliases: raw.meta.aliases.map((a) => ({
+              link_id: a.link_id,
+              source: a.source,
+              source_id: a.source_id,
+              name: a.name,
+              url: a.url ?? null,
+              status: a.status,
+              reason: a.reason ?? null,
+            })),
+          }
+        : {}),
+      ...(raw.meta.name_variants ? { name_variants: raw.meta.name_variants } : {}),
     },
     stats: {
       works: raw.stats.nodes_by_type["work"] ?? 0,
@@ -412,6 +501,7 @@ function normaliser(raw: ReferentielFichier): Referentiel {
       ...(raw.stats.recordings_with_isrc != null
         ? { recordings_with_isrc: raw.stats.recordings_with_isrc }
         : {}),
+      ...(raw.stats.ownership ? { ownership: raw.stats.ownership } : {}),
     },
     matrix,
     nodes,
@@ -444,6 +534,7 @@ function normaliser(raw: ReferentielFichier): Referentiel {
         field: a.field,
         target: a.target,
         observations,
+        ...(a.scope ? { scope: a.scope } : {}),
       };
     }),
   };
@@ -454,6 +545,22 @@ export function parseReferentiel(input: unknown): ReferentielResult {
   const parsed = schema.safeParse(input);
   if (!parsed.success) return { data: null, state: "invalid" };
   return { data: parsed.data as Referentiel, state: "ready" };
+}
+/**
+ * Variantes de nom à afficher (« Aussi connu sous ») : sans doublon et sans le nom principal de l’artiste.
+ * Ne contient jamais de nom civil : le back ne le fournit pas.
+ */
+export function variantesDeNom(meta: Meta): string[] {
+  const vus = new Set<string>([(meta.artist_name ?? "").trim().toLocaleLowerCase("fr")]);
+  const noms: string[] = [];
+  for (const nom of meta.name_variants ?? []) {
+    const propre = nom.trim();
+    const cle = propre.toLocaleLowerCase("fr");
+    if (!propre || vus.has(cle)) continue;
+    vus.add(cle);
+    noms.push(propre);
+  }
+  return noms;
 }
 /** Référentiel calculé par le worker pour un artiste suivi (table `artist_referentials`). */
 async function charger(artistId: string): Promise<ReferentielResult> {
