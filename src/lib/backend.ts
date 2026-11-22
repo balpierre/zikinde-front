@@ -101,6 +101,24 @@ export interface Anomaly {
   created_at: string;
 }
 
+export interface AnomalyExplanation {
+  anomaly_id: number;
+  job_id: string;
+  status: JobStatus;
+  explanation: {
+    summary: string;
+    next_action: string;
+    evidence: {
+      id: string;
+      source: string;
+      source_id: string;
+      url: string;
+      fetched_at: string;
+      value: string;
+    }[];
+  } | null;
+}
+
 function unwrap<T>({ data, error }: { data: T | null; error: { message: string } | null }): T {
   if (error) throw new Error(error.message);
   return data as T;
@@ -321,6 +339,25 @@ export async function getAnomalies(artistId: string): Promise<Anomaly[]> {
       .eq("org_artist_id", artistId)
       .order("created_at", { ascending: false }),
   ) as Anomaly[];
+}
+
+export function anomalyExplanationsOptions(artistId: string) {
+  return queryOptions({
+    queryKey: ["resultats", artistId, "anomaly-explanations"],
+    queryFn: async () =>
+      unwrap(
+        await supabase()
+          .from("v_anomaly_explanations")
+          .select("anomaly_id, job_id, status, explanation")
+          .eq("org_artist_id", artistId),
+      ) as AnomalyExplanation[],
+  });
+}
+
+export async function requestAnomalyExplanation(anomalyId: number): Promise<string> {
+  return unwrap(
+    await supabase().rpc("request_anomaly_explanation", { p_anomaly: anomalyId }),
+  ) as string;
 }
 
 // ------------------------------------------------------------------ imports manuels

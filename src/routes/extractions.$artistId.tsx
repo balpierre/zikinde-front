@@ -29,8 +29,10 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Shell, metadata } from "@/components/label-pulse/shared";
+import { AnomalyExplanationCard } from "@/components/extractions/anomaly-explanation";
 import { RequireAuth } from "@/components/extractions/require-auth";
 import {
+  anomalyExplanationsOptions,
   countCatalog,
   getAnomalies,
   getArtist,
@@ -38,6 +40,7 @@ import {
   getSourceAccounts,
   refreshArtist,
   watchJob,
+  type Anomaly,
   type CatalogItem,
   type CatalogType,
   type Job,
@@ -285,6 +288,11 @@ function Results({ artistId, knownIds }: { artistId: string; knownIds: Record<st
     queryKey: ["resultats", artistId, "anomalies"],
     queryFn: () => getAnomalies(artistId),
   });
+  const explanations = useQuery({
+    ...anomalyExplanationsOptions(artistId),
+    enabled: anomalies.data?.some(canExplain) ?? false,
+  });
+  const explanationsById = new Map(explanations.data?.map((report) => [report.anomaly_id, report]));
   const ids = Object.entries(knownIds).sort(([x], [y]) => x.localeCompare(y));
 
   return (
@@ -342,6 +350,18 @@ function Results({ artistId, knownIds }: { artistId: string; knownIds: Record<st
             Aucune anomalie détectée par les règles actuelles.
           </p>
         )}
+        {explanations.isError && !explanations.data && (
+          <p className="mb-3 text-sm text-muted-foreground" role="alert" lang="en">
+            Could not load explanations.{" "}
+            <Button
+              variant="link"
+              className="h-auto p-0"
+              onClick={() => void explanations.refetch()}
+            >
+              Retry
+            </Button>
+          </p>
+        )}
         <ul className="grid gap-2">
           {anomalies.data?.map((an) => (
             <li key={an.id} className="flex gap-3 rounded-lg border p-3 text-sm">
@@ -358,6 +378,13 @@ function Results({ artistId, knownIds }: { artistId: string; knownIds: Record<st
                   </span>
                 </div>
                 <AnomalyDetails details={an.details} />
+                {explanations.data && canExplain(an) && (
+                  <AnomalyExplanationCard
+                    artistId={artistId}
+                    anomalyId={an.id}
+                    report={explanationsById.get(an.id)}
+                  />
+                )}
               </div>
             </li>
           ))}
@@ -403,6 +430,23 @@ interface Observation {
   source?: string;
   value?: unknown;
   url?: string;
+}
+
+function canExplain(anomaly: Anomaly) {
+  const observations = anomaly.details["observations"];
+  return (
+    anomaly.status === "open" &&
+    ["missing_isrc", "work_without_iswc"].includes(anomaly.kind) &&
+    typeof anomaly.details["key"] === "string" &&
+    anomaly.details["key"] !== "" &&
+    Array.isArray(observations) &&
+    (observations as (Observation | null)[]).some(
+      (item) =>
+        (item?.source === "musicbrainz" || item?.source === "wikidata") &&
+        typeof item.url === "string" &&
+        typeof item.value === "string",
+    )
+  );
 }
 
 function texte(v: unknown): string {
