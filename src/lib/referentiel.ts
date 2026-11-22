@@ -24,6 +24,17 @@ export interface SetAside {
   reason?: string | null;
   score?: number | null;
 }
+/** Autre nom de l’artiste : compte déclaré par une source (alias, projet). Jamais le nom civil. */
+export interface Alias {
+  link_id: number;
+  source: string;
+  source_id: string;
+  name: string;
+  url: string | null;
+  /** `proposed` (à vérifier), `validated` (retenu) ou `rejected` (refusé). */
+  status: string;
+  reason: string | null;
+}
 export interface Meta {
   focus_artist?: string;
   artist_name?: string;
@@ -35,6 +46,10 @@ export interface Meta {
   set_aside?: SetAside[];
   /** Profil du label client (plan 02) ; absent avant déploiement du back. */
   label_profile?: { names: string[]; upc_prefixes: string[]; isrc_registrants: string[] };
+  /** Autres noms proposés, retenus ou refusés. Absent avant déploiement du back alias. */
+  aliases?: Alias[];
+  /** Variantes du nom (union dédoublonnée des sources). Absent avant déploiement du back alias. */
+  name_variants?: string[];
 }
 export interface Stats {
   works?: number;
@@ -264,6 +279,22 @@ const rawSchema = z.object({
         isrc_registrants: z.array(z.string()).default([]),
       })
       .nullish(),
+    // Optionnels et tolérants : absents ou mal formés, ils masquent seulement la section concernée.
+    aliases: z
+      .array(
+        z.object({
+          source: z.string(),
+          source_id: z.string(),
+          name: z.string(),
+          url: z.string().nullish(),
+          status: z.string(),
+          reason: z.string().nullish(),
+          link_id: z.number(),
+        }),
+      )
+      .optional()
+      .catch(undefined),
+    name_variants: z.array(z.string()).optional().catch(undefined),
   }),
   focus_artist: z.string(),
   stats: z
@@ -446,6 +477,20 @@ function normaliser(raw: ReferentielFichier): Referentiel {
       notes: raw.meta.notes,
       sources: metaSources,
       ...(raw.meta.label_profile ? { label_profile: raw.meta.label_profile } : {}),
+      ...(raw.meta.aliases
+        ? {
+            aliases: raw.meta.aliases.map((a) => ({
+              link_id: a.link_id,
+              source: a.source,
+              source_id: a.source_id,
+              name: a.name,
+              url: a.url ?? null,
+              status: a.status,
+              reason: a.reason ?? null,
+            })),
+          }
+        : {}),
+      ...(raw.meta.name_variants ? { name_variants: raw.meta.name_variants } : {}),
     },
     stats: {
       works: raw.stats.nodes_by_type["work"] ?? 0,
@@ -500,6 +545,22 @@ export function parseReferentiel(input: unknown): ReferentielResult {
   const parsed = schema.safeParse(input);
   if (!parsed.success) return { data: null, state: "invalid" };
   return { data: parsed.data as Referentiel, state: "ready" };
+}
+/**
+ * Variantes de nom à afficher (« Aussi connu sous ») : sans doublon et sans le nom principal de l’artiste.
+ * Ne contient jamais de nom civil : le back ne le fournit pas.
+ */
+export function variantesDeNom(meta: Meta): string[] {
+  const vus = new Set<string>([(meta.artist_name ?? "").trim().toLocaleLowerCase("fr")]);
+  const noms: string[] = [];
+  for (const nom of meta.name_variants ?? []) {
+    const propre = nom.trim();
+    const cle = propre.toLocaleLowerCase("fr");
+    if (!propre || vus.has(cle)) continue;
+    vus.add(cle);
+    noms.push(propre);
+  }
+  return noms;
 }
 /** Référentiel calculé par le worker pour un artiste suivi (table `artist_referentials`). */
 async function charger(artistId: string): Promise<ReferentielResult> {

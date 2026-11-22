@@ -279,6 +279,19 @@ export async function acceptAccount(linkId: number): Promise<string> {
   return unwrap(await supabase().rpc("accept_account", { p_link: linkId })) as string;
 }
 
+/**
+ * Valide ou refuse un autre nom proposé (« C’est lui » / « Ce n’est pas lui »). Renvoie l’uuid du job :
+ * `collect` après validation, `reconcile` après refus.
+ */
+export async function decideAlias(
+  linkId: number,
+  status: "validated" | "rejected",
+): Promise<string> {
+  return unwrap(
+    await supabase().rpc("decide_alias", { p_link: linkId, p_status: status }),
+  ) as string;
+}
+
 /** Valide, refuse ou remet en attente un rapprochement (compte ou titre). */
 export async function decideLink(linkId: number, status: LinkStatus): Promise<void> {
   const { error } = await supabase().rpc("decide_link", { p_link: linkId, p_status: status });

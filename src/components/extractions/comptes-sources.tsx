@@ -13,7 +13,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { acceptAccount, rejectAccount, waitJob, type SourceAccount } from "@/lib/backend";
-import { methodeLien, nomSource } from "@/lib/extraction-libelles";
+import { estAlias, methodeLien, nomSource } from "@/lib/extraction-libelles";
 import type { SetAside } from "@/lib/referentiel";
 import type { Revue } from "@/hooks/use-revue";
 
@@ -43,8 +43,15 @@ interface ComptesSourcesProps {
  * Les comptes proposés viennent de `v_artist_sources` ; les comptes refusés, absents de cette vue, viennent
  * de `meta.set_aside` du référentiel.
  */
-export function ComptesSources({ comptes, setAside, revue, onCollecte }: ComptesSourcesProps) {
+export function ComptesSources({
+  comptes: tousLesComptes,
+  setAside,
+  revue,
+  onCollecte,
+}: ComptesSourcesProps) {
   const [choix, setChoix] = useState<Choix | null>(null);
+  // Les autres noms (alias) ont leur propre section : jamais en double ici.
+  const comptes = tousLesComptes.filter((c) => !estAlias(c.method));
   const retenus = comptes.filter((c) => c.link_status === "validated");
 
   const misDeCote = new Map<number, MisDeCote>();

@@ -62,6 +62,11 @@ export const methodesLien: Record<string, string> = {
   user_selected: "choisi par vous",
 };
 
+/** Vrai si le compte a été proposé comme autre nom de l’artiste (méthode `alias:<source>`). */
+export function estAlias(method: string): boolean {
+  return method.startsWith("alias:");
+}
+
 export function methodeLien(method: string): string {
   if (method.startsWith("declared:")) {
     return `déclaré par ${method.slice(9).split("+").map(nomSource).join(", ")}`;
