@@ -8,6 +8,7 @@ import {
   Disc3,
   FileMusic,
   Search,
+  Users,
   ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,7 @@ export function Shell({
   active = "search",
 }: {
   children: React.ReactNode;
-  active?: "search" | "reference" | "extractions";
+  active?: "search" | "reference" | "extractions" | "membres";
 }) {
   const { session } = useSession();
   return (
@@ -58,6 +59,14 @@ export function Shell({
                 Extractions
               </Link>
             </Button>
+            {session && (
+              <Button variant="ghost" asChild className={active === "membres" ? "nav-active" : ""}>
+                <Link to="/membres">
+                  <Users />
+                  Membres
+                </Link>
+              </Button>
+            )}
             {session ? (
               <Button
                 variant="ghost"
